@@ -1,0 +1,73 @@
+[package]
+name = "viper"
+version = "0.1.0"
+edition = "2024"
+description = "A TypeScript runtime powered by Boa JS engine and OXC"
+license = "MIT"
+
+[dependencies]
+# Boa JS Engine - v0.21
+boa_engine = "0.21"
+boa_runtime = { version = "0.21", features = ["fetch", "reqwest-blocking"] }
+boa_gc = "0.21"
+
+# OXC - TypeScript parsing and transformation
+oxc_allocator = "0.105"
+oxc_parser = "0.105"
+oxc_transformer = "0.105"
+oxc_codegen = "0.105"
+oxc_span = "0.105"
+oxc_ast = "0.105"
+oxc_semantic = "0.105"
+
+# Module resolution (independent versioning)
+oxc_resolver = "11.16"
+
+# CLI and utilities
+clap = { version = "4", features = ["derive"] }
+thiserror = "2"
+miette = { version = "7", features = ["fancy"] }
+colored = "2"
+
+# Async runtime for fetch and other async APIs
+tokio = { version = "1", features = ["full"] }
+
+# Crypto support
+uuid = { version = "1", features = ["v4"] }
+rand = "0.9"
+
+# WebSocket support (using web-socket - fastest implementation)
+web-socket = "0.7"
+futures-util = "0.3"
+
+# HTTP server (Hyper for ultra-fast single-threaded server)
+hyper = { version = "1", features = ["http1", "server"], optional = true }
+hyper-util = { version = "0.1", features = ["tokio"], optional = true }
+http-body-util = { version = "0.1", optional = true }
+bytes = { version = "1", optional = true }
+sha1 = { version = "0.10", optional = true }
+base64 = { version = "0.22", optional = true }
+
+# Also keep Axum for the CLI serve command
+axum = { version = "0.7", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+num_cpus = { version = "1.16", optional = true }
+
+# Rolldown bundler (Rust-based, Rollup-compatible)
+# Note: Rolldown is in early development, may have API changes
+rolldown = { version = "0.1", optional = true }
+
+# Package manager (Orogene - fast npm-compatible package manager)
+node-maintainer = { version = "0.3", optional = true }
+nassun = { version = "0.3", optional = true }
+oro-common = { version = "0.3", optional = true }
+oro-package-spec = { version = "0.3", optional = true }
+async-std = { version = "1.12", optional = true }
+indicatif = { version = "0.17", optional = true }
+url = { version = "2", optional = true }
+
+[features]
+default = []
+server = ["hyper", "hyper-util", "http-body-util", "bytes", "sha1", "base64", "axum", "serde", "serde_json", "num_cpus"]
+pm = ["node-maintainer", "nassun", "oro-common", "oro-package-spec", "async-std", "indicatif", "url", "serde", "serde_json"]

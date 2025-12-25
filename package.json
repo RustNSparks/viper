@@ -1,0 +1,32 @@
+{
+  "name": "viper",
+  "version": "0.1.0",
+  "description": "A TypeScript runtime powered by Boa JS engine and OXC",
+  "main": "index.js",
+  "types": "types/viper.d.ts",
+  "scripts": {
+    "dev": "cargo run --",
+    "build": "cargo build --release",
+    "test": "cargo test"
+  },
+  "keywords": [
+    "typescript",
+    "runtime",
+    "boa",
+    "oxc",
+    "jsx",
+    "tsx"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "express": "*",
+    "vue": "*",
+    "bun": "*",
+    "@types/express": "*",
+    "date-fns": "*"
+  }
+}
