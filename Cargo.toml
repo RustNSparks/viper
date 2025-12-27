@@ -56,7 +56,7 @@ num_cpus = { version = "1.16", optional = true }
 
 # Rolldown bundler (Rust-based, Rollup-compatible)
 # Note: Rolldown is in early development, may have API changes
-rolldown = { version = "0.1", optional = true }
+rolldown = { git = "https://github.com/rolldown/rolldown", package = "rolldown", tag = "v1.0.0-beta.57", optional = true }
 
 # Package manager (Orogene - fast npm-compatible package manager)
 node-maintainer = { version = "0.3", optional = true }
@@ -68,6 +68,6 @@ indicatif = { version = "0.17", optional = true }
 url = { version = "2", optional = true }
 
 [features]
-default = []
+default = ["server", "pm"]
 server = ["hyper", "hyper-util", "http-body-util", "bytes", "sha1", "base64", "axum", "serde", "serde_json", "num_cpus"]
 pm = ["node-maintainer", "nassun", "oro-common", "oro-package-spec", "async-std", "indicatif", "url", "serde", "serde_json"]

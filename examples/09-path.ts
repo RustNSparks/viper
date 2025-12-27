@@ -11,17 +11,25 @@ console.log(`  Delimiter: "${path.delimiter}"\n`);
 
 // Join paths
 console.log("2. path.join():");
-console.log(`  join("src", "lib", "index.ts"): ${path.join("src", "lib", "index.ts")}`);
-console.log(`  join("/home", "user", "..", "admin"): ${path.join("/home", "user", "..", "admin")}\n`);
+console.log(
+  `  join("src", "lib", "index.ts"): ${path.join("src", "lib", "index.ts")}`,
+);
+console.log(
+  `  join("/home", "user", "..", "admin"): ${path.join("/home", "user", "..", "admin")}\n`,
+);
 
 // Resolve paths
 console.log("3. path.resolve():");
 console.log(`  resolve("."): ${path.resolve(".")}`);
-console.log(`  resolve("src", "index.ts"): ${path.resolve("src", "index.ts")}\n`);
+console.log(
+  `  resolve("src", "index.ts"): ${path.resolve("src", "index.ts")}\n`,
+);
 
 // Normalize paths
 console.log("4. path.normalize():");
-console.log(`  normalize("src//lib/../utils/./index.ts"): ${path.normalize("src//lib/../utils/./index.ts")}\n`);
+console.log(
+  `  normalize("src//lib/../utils/./index.ts"): ${path.normalize("src//lib/../utils/./index.ts")}\n`,
+);
 
 // Path components
 const testPath = "/home/user/projects/app/src/index.ts";
@@ -58,7 +66,9 @@ console.log(`  isAbsolute("C:\\\\Users"): ${path.isAbsolute("C:\\Users")}\n`);
 
 // Relative paths
 console.log("9. path.relative():");
-console.log(`  relative("/home/user/src", "/home/user/docs"): ${path.relative("/home/user/src", "/home/user/docs")}\n`);
+console.log(
+  `  relative("/home/user/src", "/home/user/docs"): ${path.relative("/home/user/src", "/home/user/docs")}\n`,
+);
 
 // Cross-platform paths
 console.log("10. Cross-Platform (posix vs win32):");

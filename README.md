@@ -68,6 +68,23 @@ viper add -D typescript  # dev dependency
 viper remove lodash
 ```
 
+### Bundler
+
+Basic bundler that transpiles and concatenates TypeScript/JavaScript files:
+
+```bash
+# Bundle files
+viper build src/index.ts -o dist --format esm
+
+# With minification
+viper build src/index.ts -o dist --minify
+
+# Different formats (esm, cjs, iife)
+viper build src/index.ts -o dist --format iife
+```
+
+> **Note:** The `rolldown` feature is currently disabled due to compatibility issues with `oxc_resolver` v11.16. Viper uses a simple transpile-and-concatenate bundler. For production bundling, consider using external tools like esbuild or Rollup.
+
 ## Installation
 
 ### From Source
@@ -428,6 +445,8 @@ Note: **Runtime performance** is currently slower than Node.js/Bun because Boa i
 - **No Node.js Built-in Modules** - `fs`, `http`, `events`, etc. are not implemented (use Viper's APIs instead)
 - **No npm Lifecycle Scripts** - `postinstall` scripts don't run
 - **No Full Node.js Compatibility** - This is not a drop-in Node.js replacement
+- **Basic Bundler** - Built-in bundler is simple concatenation. For advanced bundling (tree-shaking, code-splitting), use external tools like esbuild or Rollup
+- **Rolldown Not Supported** - The Rolldown bundler integration is disabled due to version incompatibilities between `rolldown_fs` and `oxc_resolver` v11.16
 
 ## Why Viper?
 
