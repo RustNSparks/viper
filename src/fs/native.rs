@@ -3,9 +3,8 @@
 //! Implements Bun-style fs API using Boa's promise system and tokio for async I/O
 
 use boa_engine::{
-    job::NativeJob,
-    js_string, Context, JsArgs, JsError, JsNativeError, JsObject, JsResult, JsValue,
-    NativeFunction, Source,
+    Context, JsArgs, JsError, JsNativeError, JsObject, JsResult, JsValue, NativeFunction, Source,
+    job::NativeJob, js_string,
 };
 use boa_gc::{Finalize, Trace};
 use std::path::PathBuf;
@@ -151,6 +150,18 @@ pub fn register_file_system(context: &mut Context) -> JsResult<()> {
 
             throw new TypeError('Invalid data type');
         };
+
+        // mkdir - Create directory
+        globalThis.mkdir = (path, options = {}) => {
+            const recursive = options.recursive === true;
+            return __viper_mkdir(path, recursive);
+        };
+
+        // rmdir - Remove directory
+        globalThis.rmdir = (path, options = {}) => {
+            const recursive = options.recursive === true;
+            return __viper_rmdir(path, recursive);
+        };
     "#;
 
     let source = Source::from_bytes(fs_polyfill.as_bytes());
@@ -166,7 +177,10 @@ pub fn register_file_system(context: &mut Context) -> JsResult<()> {
 fn register_native_functions(context: &mut Context) -> JsResult<()> {
     // __viper_read_text - Read file as text
     let read_text = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
 
         // Create a promise
         let (promise, resolvers) = JsObject::promise(context);
@@ -185,7 +199,7 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to read file: {}", e))
+                        JsNativeError::error().with_message(format!("Failed to read file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -198,16 +212,16 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_read_text"),
-        read_text,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_read_text"), read_text, false, context)?;
 
     // __viper_read_bytes - Read file as bytes
     let read_bytes = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
 
         let (promise, resolvers) = JsObject::promise(context);
         let resolve = resolvers.resolve.clone();
@@ -218,11 +232,11 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
             match runtime.block_on(tokio::fs::read(&path)) {
                 Ok(bytes) => {
                     // Create Uint8Array from bytes
-                    let array = context.intrinsics().constructors().uint8_array().construct(
-                        &[JsValue::from(bytes.len())],
-                        None,
-                        context,
-                    )?;
+                    let array = context
+                        .intrinsics()
+                        .constructors()
+                        .uint8_array()
+                        .construct(&[JsValue::from(bytes.len())], None, context)?;
 
                     // Copy bytes into the array
                     if let Some(obj) = array.as_object() {
@@ -235,7 +249,7 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to read file: {}", e))
+                        JsNativeError::error().with_message(format!("Failed to read file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -247,16 +261,16 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_read_bytes"),
-        read_bytes,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_read_bytes"), read_bytes, false, context)?;
 
     // __viper_exists - Check if file exists
     let exists = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
 
         let (promise, resolvers) = JsObject::promise(context);
         let resolve = resolvers.resolve.clone();
@@ -272,16 +286,16 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_exists"),
-        exists,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_exists"), exists, false, context)?;
 
     // __viper_stat - Get file stats
     let stat = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
 
         let (promise, resolvers) = JsObject::promise(context);
         let resolve = resolvers.resolve.clone();
@@ -292,15 +306,30 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
             match runtime.block_on(tokio::fs::metadata(&path)) {
                 Ok(metadata) => {
                     let stats = JsObject::with_object_proto(context.intrinsics());
-                    stats.set(js_string!("size"), JsValue::from(metadata.len() as f64), false, context)?;
-                    stats.set(js_string!("isFile"), JsValue::from(metadata.is_file()), false, context)?;
-                    stats.set(js_string!("isDirectory"), JsValue::from(metadata.is_dir()), false, context)?;
+                    stats.set(
+                        js_string!("size"),
+                        JsValue::from(metadata.len() as f64),
+                        false,
+                        context,
+                    )?;
+                    stats.set(
+                        js_string!("isFile"),
+                        JsValue::from(metadata.is_file()),
+                        false,
+                        context,
+                    )?;
+                    stats.set(
+                        js_string!("isDirectory"),
+                        JsValue::from(metadata.is_dir()),
+                        false,
+                        context,
+                    )?;
 
                     resolve.call(&JsValue::undefined(), &[stats.into()], context)?;
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to stat file: {}", e))
+                        JsNativeError::error().with_message(format!("Failed to stat file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -312,16 +341,16 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_stat"),
-        stat,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_stat"), stat, false, context)?;
 
     // __viper_write - Write bytes to file
     let write = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
         let data_arg = args.get_or_undefined(1);
 
         // Extract bytes from Uint8Array
@@ -349,11 +378,15 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
             let runtime = tokio::runtime::Runtime::new().unwrap();
             match runtime.block_on(tokio::fs::write(&path, &bytes)) {
                 Ok(_) => {
-                    resolve.call(&JsValue::undefined(), &[JsValue::from(bytes.len() as f64)], context)?;
+                    resolve.call(
+                        &JsValue::undefined(),
+                        &[JsValue::from(bytes.len() as f64)],
+                        context,
+                    )?;
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to write file: {}", e))
+                        JsNativeError::error().with_message(format!("Failed to write file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -365,16 +398,16 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_write"),
-        write,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_write"), write, false, context)?;
 
     // __viper_append - Append bytes to file
     let append = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
         let data_arg = args.get_or_undefined(1);
 
         let mut bytes = Vec::new();
@@ -416,7 +449,8 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to append to file: {}", e))
+                        JsNativeError::error()
+                            .with_message(format!("Failed to append to file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -428,16 +462,16 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_append"),
-        append,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_append"), append, false, context)?;
 
     // __viper_delete - Delete file
     let delete = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let path = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
 
         let (promise, resolvers) = JsObject::promise(context);
         let resolve = resolvers.resolve.clone();
@@ -451,7 +485,8 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to delete file: {}", e))
+                        JsNativeError::error()
+                            .with_message(format!("Failed to delete file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -463,17 +498,20 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_delete"),
-        delete,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_delete"), delete, false, context)?;
 
     // __viper_copy - Copy file
     let copy = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let src = args.get_or_undefined(0).to_string(context)?.to_std_string_escaped();
-        let dest = args.get_or_undefined(1).to_string(context)?.to_std_string_escaped();
+        let src = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
+        let dest = args
+            .get_or_undefined(1)
+            .to_string(context)?
+            .to_std_string_escaped();
 
         let (promise, resolvers) = JsObject::promise(context);
         let resolve = resolvers.resolve.clone();
@@ -483,11 +521,15 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
             let runtime = tokio::runtime::Runtime::new().unwrap();
             match runtime.block_on(tokio::fs::copy(&src, &dest)) {
                 Ok(bytes) => {
-                    resolve.call(&JsValue::undefined(), &[JsValue::from(bytes as f64)], context)?;
+                    resolve.call(
+                        &JsValue::undefined(),
+                        &[JsValue::from(bytes as f64)],
+                        context,
+                    )?;
                 }
                 Err(e) => {
                     let error = JsError::from_native(
-                        JsNativeError::error().with_message(format!("Failed to copy file: {}", e))
+                        JsNativeError::error().with_message(format!("Failed to copy file: {}", e)),
                     );
                     reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
                 }
@@ -499,12 +541,95 @@ fn register_native_functions(context: &mut Context) -> JsResult<()> {
         Ok(promise.into())
     });
 
-    context.global_object().set(
-        js_string!("__viper_copy"),
-        copy,
-        false,
-        context,
-    )?;
+    context
+        .global_object()
+        .set(js_string!("__viper_copy"), copy, false, context)?;
+
+    // __viper_mkdir - Create directory (recursively)
+    let mkdir = NativeFunction::from_fn_ptr(|_this, args, context| {
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
+        let recursive = args.get_or_undefined(1).to_boolean();
+
+        let (promise, resolvers) = JsObject::promise(context);
+        let resolve = resolvers.resolve.clone();
+        let reject = resolvers.reject.clone();
+
+        let job = NativeJob::new(move |context| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let result = if recursive {
+                runtime.block_on(tokio::fs::create_dir_all(&path))
+            } else {
+                runtime.block_on(tokio::fs::create_dir(&path))
+            };
+
+            match result {
+                Ok(_) => {
+                    resolve.call(&JsValue::undefined(), &[JsValue::undefined()], context)?;
+                }
+                Err(e) => {
+                    let error = JsError::from_native(
+                        JsNativeError::error()
+                            .with_message(format!("Failed to create directory: {}", e)),
+                    );
+                    reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
+                }
+            }
+            Ok(())
+        });
+
+        context.job_queue().enqueue_promise_job(job, context);
+        Ok(promise.into())
+    });
+
+    context
+        .global_object()
+        .set(js_string!("__viper_mkdir"), mkdir, false, context)?;
+
+    // __viper_rmdir - Remove directory
+    let rmdir = NativeFunction::from_fn_ptr(|_this, args, context| {
+        let path = args
+            .get_or_undefined(0)
+            .to_string(context)?
+            .to_std_string_escaped();
+        let recursive = args.get_or_undefined(1).to_boolean();
+
+        let (promise, resolvers) = JsObject::promise(context);
+        let resolve = resolvers.resolve.clone();
+        let reject = resolvers.reject.clone();
+
+        let job = NativeJob::new(move |context| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let result = if recursive {
+                runtime.block_on(tokio::fs::remove_dir_all(&path))
+            } else {
+                runtime.block_on(tokio::fs::remove_dir(&path))
+            };
+
+            match result {
+                Ok(_) => {
+                    resolve.call(&JsValue::undefined(), &[JsValue::undefined()], context)?;
+                }
+                Err(e) => {
+                    let error = JsError::from_native(
+                        JsNativeError::error()
+                            .with_message(format!("Failed to remove directory: {}", e)),
+                    );
+                    reject.call(&JsValue::undefined(), &[error.to_opaque(context)], context)?;
+                }
+            }
+            Ok(())
+        });
+
+        context.job_queue().enqueue_promise_job(job, context);
+        Ok(promise.into())
+    });
+
+    context
+        .global_object()
+        .set(js_string!("__viper_rmdir"), rmdir, false, context)?;
 
     Ok(())
 }

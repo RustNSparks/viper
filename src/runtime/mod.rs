@@ -34,8 +34,33 @@ use std::{
     cell::RefCell,
     path::{Path, PathBuf},
     rc::Rc,
+    sync::atomic::{AtomicU32, Ordering},
 };
 use thiserror::Error;
+
+/// Global counter for pending timers (setTimeout/setInterval)
+/// This allows the event loop to know when to keep running
+static PENDING_TIMER_COUNT: AtomicU32 = AtomicU32::new(0);
+
+/// Increment pending timer count
+pub fn increment_pending_timers() {
+    PENDING_TIMER_COUNT.fetch_add(1, Ordering::SeqCst);
+}
+
+/// Decrement pending timer count
+pub fn decrement_pending_timers() {
+    PENDING_TIMER_COUNT.fetch_sub(1, Ordering::SeqCst);
+}
+
+/// Check if there are pending timers
+pub fn has_pending_timers() -> bool {
+    PENDING_TIMER_COUNT.load(Ordering::SeqCst) > 0
+}
+
+/// Reset pending timer count (for new runtime instances)
+fn reset_pending_timers() {
+    PENDING_TIMER_COUNT.store(0, Ordering::SeqCst);
+}
 
 mod crypto;
 mod event_loop;
@@ -525,6 +550,9 @@ impl Runtime {
         // Add Viper-specific globals
         Self::register_viper_globals(&mut context)?;
 
+        // Wrap setTimeout/setInterval to track pending timers
+        Self::wrap_timer_functions(&mut context)?;
+
         // Register high-performance file system API
         fs::simple::register_file_system(&mut context)
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
@@ -592,6 +620,103 @@ impl Runtime {
 
         // Add JSX runtime
         Self::register_jsx_runtime(context)?;
+
+        Ok(())
+    }
+
+    /// Wrap setTimeout/setInterval to track pending timers for the event loop
+    fn wrap_timer_functions(context: &mut Context) -> RuntimeResult<()> {
+        // Reset timer count for this runtime instance
+        reset_pending_timers();
+
+        let wrapper_code = r#"
+            (function() {
+                // Store original functions
+                const _origSetTimeout = globalThis.setTimeout;
+                const _origSetInterval = globalThis.setInterval;
+                const _origClearTimeout = globalThis.clearTimeout;
+                const _origClearInterval = globalThis.clearInterval;
+
+                // Track active timers
+                const activeTimers = new Set();
+                const activeIntervals = new Set();
+
+                // Wrap setTimeout
+                globalThis.setTimeout = function(callback, delay, ...args) {
+                    __viper_timer_increment();
+                    const id = _origSetTimeout(function() {
+                        activeTimers.delete(id);
+                        __viper_timer_decrement();
+                        callback.apply(this, args);
+                    }, delay);
+                    activeTimers.add(id);
+                    return id;
+                };
+
+                // Wrap setInterval
+                globalThis.setInterval = function(callback, delay, ...args) {
+                    __viper_timer_increment();
+                    const id = _origSetInterval(function() {
+                        callback.apply(this, args);
+                    }, delay);
+                    activeIntervals.add(id);
+                    return id;
+                };
+
+                // Wrap clearTimeout
+                globalThis.clearTimeout = function(id) {
+                    if (activeTimers.has(id)) {
+                        activeTimers.delete(id);
+                        __viper_timer_decrement();
+                    }
+                    return _origClearTimeout(id);
+                };
+
+                // Wrap clearInterval
+                globalThis.clearInterval = function(id) {
+                    if (activeIntervals.has(id)) {
+                        activeIntervals.delete(id);
+                        __viper_timer_decrement();
+                    }
+                    return _origClearInterval(id);
+                };
+            })();
+        "#;
+
+        // Register native timer tracking functions
+        let increment_fn = boa_engine::NativeFunction::from_fn_ptr(|_this, _args, _context| {
+            increment_pending_timers();
+            Ok(JsValue::undefined())
+        });
+        context
+            .global_object()
+            .set(
+                js_string!("__viper_timer_increment"),
+                increment_fn.to_js_function(context.realm()),
+                false,
+                context,
+            )
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        let decrement_fn = boa_engine::NativeFunction::from_fn_ptr(|_this, _args, _context| {
+            decrement_pending_timers();
+            Ok(JsValue::undefined())
+        });
+        context
+            .global_object()
+            .set(
+                js_string!("__viper_timer_decrement"),
+                decrement_fn.to_js_function(context.realm()),
+                false,
+                context,
+            )
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Execute wrapper code
+        let source = Source::from_bytes(wrapper_code.as_bytes());
+        context
+            .eval(source)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
         Ok(())
     }
@@ -856,23 +981,47 @@ impl Runtime {
         result.map_err(|e| RuntimeError::JsError(e.to_string()))
     }
 
-    /// Run the event loop until all work is complete (including workers)
+    /// Run the event loop until all work is complete (including workers, timers, promises)
+    ///
+    /// This implements a proper event loop that:
+    /// 1. Runs all immediate jobs (promises, microtasks)
+    /// 2. Waits for timers to fire and runs their callbacks
+    /// 3. Keeps running while there are active workers
     fn run_event_loop(&mut self) -> RuntimeResult<()> {
+        use std::time::{Duration, Instant};
+
+        let start_time = Instant::now();
+        let max_runtime = Duration::from_secs(300); // 5 minute max runtime safety limit
+
         loop {
-            // Run any pending jobs
+            // Safety: don't run forever
+            if start_time.elapsed() > max_runtime {
+                break;
+            }
+
+            // Run pending jobs - this processes promises and ready timers
             self.context
                 .run_jobs()
                 .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
-            // Check if there are active workers that should keep us alive
-            if !worker::has_active_workers() {
-                break;
+            // Check if we have active workers or pending timers
+            let has_workers = worker::has_active_workers();
+            let has_timers = has_pending_timers();
+
+            // If we have workers or pending timers, keep running
+            if has_workers || has_timers {
+                std::thread::sleep(Duration::from_millis(1));
+                continue;
             }
 
-            // Small sleep to avoid busy-waiting, then run jobs again
-            // This allows timer callbacks and worker message polling to execute
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            // No workers and no pending timers - we're done
+            break;
         }
+
+        // Final cleanup run
+        self.context
+            .run_jobs()
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
         Ok(())
     }
@@ -888,9 +1037,11 @@ impl Runtime {
         self.run(&source, filename)
     }
 
-    /// Execute TypeScript code as a module
+    /// Execute TypeScript code as a module (supports top-level await)
     #[allow(dead_code)]
     pub fn execute_module(&mut self, code: &str, filename: &str) -> RuntimeResult<JsValue> {
+        use std::time::{Duration, Instant};
+
         // Transpile if TypeScript
         let is_typescript = filename.ends_with(".ts") || filename.ends_with(".tsx");
         let js_code = if is_typescript {
@@ -907,27 +1058,77 @@ impl Runtime {
         // Load and evaluate the module
         let promise = module.load_link_evaluate(&mut self.context);
 
-        // Run jobs to execute the module
-        self.context
-            .run_jobs()
-            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+        // Run the event loop until the module promise resolves
+        // This handles top-level await properly
+        let start_time = Instant::now();
+        let max_runtime = Duration::from_secs(300); // 5 minute max
 
-        // Check if the promise resolved successfully
-        match promise.state() {
-            PromiseState::Fulfilled(_) => {
-                // Module executed, now run event loop for workers/timers
-                self.run_event_loop()?;
-                Ok(JsValue::undefined())
+        loop {
+            // Safety check
+            if start_time.elapsed() > max_runtime {
+                return Err(RuntimeError::ModuleError(
+                    "Module execution timed out".to_string(),
+                ));
             }
-            PromiseState::Rejected(err) => {
-                let err_str: JsString = err
-                    .to_string(&mut self.context)
-                    .unwrap_or_else(|_| js_string!("Unknown error"));
-                Err(RuntimeError::ModuleError(err_str.to_std_string_escaped()))
+
+            // Run pending jobs
+            self.context
+                .run_jobs()
+                .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+            // Check promise state
+            match promise.state() {
+                PromiseState::Fulfilled(_) => {
+                    // Module executed successfully, now run event loop for workers/timers
+                    self.run_event_loop()?;
+                    return Ok(JsValue::undefined());
+                }
+                PromiseState::Rejected(err) => {
+                    let err_str: JsString = err
+                        .to_string(&mut self.context)
+                        .unwrap_or_else(|_| js_string!("Unknown error"));
+                    return Err(RuntimeError::ModuleError(err_str.to_std_string_escaped()));
+                }
+                PromiseState::Pending => {
+                    // Still pending - check if we have timers or workers keeping us alive
+                    let has_workers = worker::has_active_workers();
+                    let has_timers = has_pending_timers();
+
+                    if has_workers || has_timers {
+                        // Keep running, there's async work to do
+                        std::thread::sleep(Duration::from_millis(1));
+                        continue;
+                    }
+
+                    // No timers or workers, but promise is pending
+                    // Give it a bit more time for microtasks to complete
+                    std::thread::sleep(Duration::from_millis(1));
+
+                    // Run jobs again
+                    self.context
+                        .run_jobs()
+                        .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+                    // Check again
+                    match promise.state() {
+                        PromiseState::Fulfilled(_) => {
+                            self.run_event_loop()?;
+                            return Ok(JsValue::undefined());
+                        }
+                        PromiseState::Rejected(err) => {
+                            let err_str: JsString = err
+                                .to_string(&mut self.context)
+                                .unwrap_or_else(|_| js_string!("Unknown error"));
+                            return Err(RuntimeError::ModuleError(err_str.to_std_string_escaped()));
+                        }
+                        PromiseState::Pending => {
+                            // If still pending with no work, it might be waiting for
+                            // something that won't happen. Continue for a bit.
+                            continue;
+                        }
+                    }
+                }
             }
-            PromiseState::Pending => Err(RuntimeError::ModuleError(
-                "Module evaluation is pending".to_string(),
-            )),
         }
     }
 

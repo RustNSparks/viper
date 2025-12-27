@@ -12,7 +12,8 @@
 //! - process.nextTick(callback) - Schedule callback before next event loop tick
 
 use boa_engine::{
-    Context, JsResult, JsValue, NativeFunction, Source, js_string, object::builtins::JsArray,
+    Context, JsResult, JsValue, NativeFunction, Source, js_string, object::ObjectInitializer,
+    object::builtins::JsArray,
 };
 
 /// Register the process object
@@ -144,6 +145,90 @@ pub fn register_process(context: &mut Context, args: &[String]) -> JsResult<()> 
     context.global_object().set(
         js_string!("__viper_hrtime_bigint"),
         hrtime_bigint_fn.to_js_function(context.realm()),
+        false,
+        context,
+    )?;
+
+    // Register __viper_cwd
+    let cwd_fn =
+        NativeFunction::from_fn_ptr(|_this, _args, _context| match std::env::current_dir() {
+            Ok(path) => Ok(JsValue::from(js_string!(
+                path.to_string_lossy().to_string()
+            ))),
+            Err(_) => Ok(JsValue::from(js_string!("."))),
+        });
+    context.global_object().set(
+        js_string!("__viper_cwd"),
+        cwd_fn.to_js_function(context.realm()),
+        false,
+        context,
+    )?;
+
+    // Register __viper_env_get
+    let env_get_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
+        let key = args
+            .get(0)
+            .map(|v| v.to_string(context))
+            .transpose()?
+            .map(|s| s.to_std_string_escaped())
+            .unwrap_or_default();
+
+        match std::env::var(&key) {
+            Ok(val) => Ok(JsValue::from(js_string!(val))),
+            Err(_) => Ok(JsValue::undefined()),
+        }
+    });
+    context.global_object().set(
+        js_string!("__viper_env_get"),
+        env_get_fn.to_js_function(context.realm()),
+        false,
+        context,
+    )?;
+
+    // Register __viper_env_set
+    let env_set_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
+        let key = args
+            .get(0)
+            .map(|v| v.to_string(context))
+            .transpose()?
+            .map(|s| s.to_std_string_escaped())
+            .unwrap_or_default();
+        let value = args
+            .get(1)
+            .map(|v| v.to_string(context))
+            .transpose()?
+            .map(|s| s.to_std_string_escaped())
+            .unwrap_or_default();
+
+        // SAFETY: Single-threaded environment
+        unsafe {
+            std::env::set_var(&key, &value);
+        }
+        Ok(JsValue::undefined())
+    });
+    context.global_object().set(
+        js_string!("__viper_env_set"),
+        env_set_fn.to_js_function(context.realm()),
+        false,
+        context,
+    )?;
+
+    // Register __viper_env_all
+    let env_all_fn = NativeFunction::from_fn_ptr(|_this, _args, context| {
+        let obj = ObjectInitializer::new(context).build();
+        for (key, value) in std::env::vars() {
+            obj.set(
+                js_string!(key),
+                JsValue::from(js_string!(value)),
+                false,
+                context,
+            )?;
+        }
+        Ok(JsValue::from(obj))
+    });
+    context.global_object().set(
+        js_string!("__viper_env_all"),
+        env_all_fn.to_js_function(context.realm()),
         false,
         context,
     )?;

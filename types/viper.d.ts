@@ -993,6 +993,10 @@ declare global {
     path: string,
     options?: { recursive?: boolean },
   ): Promise<void>;
+  function rmdir(
+    path: string,
+    options?: { recursive?: boolean },
+  ): Promise<void>;
   function stat(path: string): Promise<FileStat>;
 
   // JSX Runtime
