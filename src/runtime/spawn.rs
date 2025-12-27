@@ -6,8 +6,8 @@
 //! - Viper.$ - Tagged template literal for shell commands (Bun-style)
 
 use boa_engine::{
-    js_string, object::builtins::JsUint8Array, object::ObjectInitializer, Context, JsNativeError,
-    JsResult, JsValue, NativeFunction, Source,
+    Context, JsNativeError, JsResult, JsValue, NativeFunction, Source, js_string,
+    object::ObjectInitializer, object::builtins::JsUint8Array,
 };
 use std::process::{Command, Stdio};
 
@@ -47,7 +47,8 @@ pub fn register_spawn(context: &mut Context) -> JsResult<()> {
         // Parse options
         let options = args.get(2).and_then(|v| v.as_object());
 
-        let cwd = options.as_ref()
+        let cwd = options
+            .as_ref()
             .and_then(|o| o.get(js_string!("cwd"), context).ok())
             .and_then(|v| {
                 if v.is_undefined() || v.is_null() {
@@ -57,7 +58,8 @@ pub fn register_spawn(context: &mut Context) -> JsResult<()> {
                 }
             });
 
-        let shell = options.as_ref()
+        let shell = options
+            .as_ref()
             .and_then(|o| o.get(js_string!("shell"), context).ok())
             .map(|v| v.to_boolean())
             .unwrap_or(false);
@@ -143,15 +145,9 @@ pub fn register_spawn(context: &mut Context) -> JsResult<()> {
             .to_std_string_escaped();
 
         let output = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .arg("/C")
-                .arg(&command)
-                .output()
+            Command::new("cmd").arg("/C").arg(&command).output()
         } else {
-            Command::new("sh")
-                .arg("-c")
-                .arg(&command)
-                .output()
+            Command::new("sh").arg("-c").arg(&command).output()
         };
 
         let output = output.map_err(|e| {
@@ -201,27 +197,34 @@ pub fn register_spawn(context: &mut Context) -> JsResult<()> {
 
     // Create JavaScript wrappers
     let spawn_code = r#"
-        // Add spawn to Viper namespace (if it exists)
-        if (typeof Viper !== 'undefined') {
-            // Viper.spawn(command, args?, options?)
-            Viper.spawn = (command, args, options) => {
+        // Ensure Viper namespace exists
+        if (typeof Viper === 'undefined') {
+            globalThis.Viper = {};
+        }
+
+        // Add spawn to Viper namespace
+        {
+            // Viper.spawn(command, args?, options?) - Returns a Promise
+            Viper.spawn = async (command, args, options) => {
                 const result = __viper_spawn(command, args || [], options || {});
 
                 // Decode stdout/stderr to strings
                 const decoder = new TextDecoder();
+                const stdoutText = decoder.decode(result.stdout);
+                const stderrText = decoder.decode(result.stderr);
+
                 return {
                     exitCode: result.exitCode,
                     success: result.success,
-                    stdout: result.stdout,
-                    stderr: result.stderr,
-                    text: () => decoder.decode(result.stdout),
-                    // For convenience
-                    toString: () => decoder.decode(result.stdout).trim(),
+                    stdout: stdoutText,
+                    stderr: stderrText,
+                    text: () => stdoutText,
+                    toString: () => stdoutText.trim(),
                 };
             };
 
-            // Viper.exec(command) - Simple shell execution returning strings
-            Viper.exec = (command) => {
+            // Viper.exec(command) - Simple shell execution returning strings (async)
+            Viper.exec = async (command) => {
                 const result = __viper_exec(command);
                 return {
                     exitCode: result.exitCode,

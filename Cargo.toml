@@ -36,8 +36,8 @@ tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 rand = "0.9"
 
-# WebSocket support (using web-socket - fastest implementation)
-web-socket = "0.7"
+# WebSocket support (using tokio-tungstenite - reliable with TLS support)
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util = "0.3"
 
 # HTTP server (Hyper for ultra-fast single-threaded server)
