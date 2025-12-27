@@ -14,7 +14,9 @@ mod error;
 mod installer;
 
 pub use error::{PmError, PmResult};
-pub use installer::{PackageManager, PackageManagerConfig};
+pub use installer::{
+    InstallResult, InstalledPackage, PackageInfo, PackageManager, PackageManagerConfig,
+};
 
 /// Default npm registry URL
 pub const DEFAULT_REGISTRY: &str = "https://registry.npmjs.org/";

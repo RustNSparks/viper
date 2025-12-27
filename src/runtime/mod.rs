@@ -39,10 +39,12 @@ use thiserror::Error;
 
 mod crypto;
 mod event_loop;
+mod path;
 mod process;
 mod server_api;
 mod spawn;
 mod websocket;
+pub mod worker;
 
 use crate::fs;
 use crate::resolver::ModuleResolver;
@@ -110,6 +112,26 @@ impl TypeScriptModuleLoader {
             base_path: base.clone(),
             transpiler: Transpiler::new(),
             resolver: ModuleResolver::new(&base),
+        }
+    }
+
+    /// Get built-in module code for Node.js compatible modules
+    fn get_builtin_module(specifier: &str) -> Option<String> {
+        match specifier {
+            "path" | "node:path" => Some(
+                r#"
+                const p = globalThis.path;
+                export default p;
+                export const {
+                    sep, delimiter, join, resolve, normalize, dirname,
+                    basename, extname, isAbsolute, relative, parse,
+                    format, toNamespacedPath, matchesGlob, posix, win32
+                } = p;
+                "#
+                .to_string(),
+            ),
+            // Add more built-in modules here as they're implemented
+            _ => None,
         }
     }
 }
@@ -317,22 +339,19 @@ impl ModuleLoader for TypeScriptModuleLoader {
         let specifier_str = specifier.to_std_string_escaped();
 
         async move {
-            // Determine the referrer path for resolution
-            let referrer_path = match referrer {
-                Referrer::Module(_module) => {
-                    // For now, use base path for module imports
-                    // TODO: Track module paths for better resolution
-                    self.base_path.join("index.ts")
-                }
-                Referrer::Script(_script) => {
-                    // For scripts, use base path
-                    self.base_path.join("index.ts")
-                }
-                Referrer::Realm(_realm) => {
-                    // Default to base path for realm
-                    self.base_path.join("index.ts")
-                }
-            };
+            // Check for built-in modules first
+            if let Some(builtin_code) = Self::get_builtin_module(&specifier_str) {
+                let mut ctx = context.borrow_mut();
+                let source = Source::from_bytes(builtin_code.as_bytes());
+                return Module::parse(source, None, &mut *ctx);
+            }
+
+            // Get the referrer path using Boa's built-in path() method
+            // This properly tracks where each module is loaded from
+            let referrer_path = referrer
+                .path()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| self.base_path.join("index.ts"));
 
             // Use oxc_resolver for Node.js/Bun-compatible module resolution
             let resolved_path = self
@@ -376,15 +395,17 @@ impl ModuleLoader for TypeScriptModuleLoader {
             };
 
             // Check if this is a CommonJS module and bundle it for ESM compatibility
-            let final_code = if Self::is_commonjs(&js_code) {
+            let esm_code = if Self::is_commonjs(&js_code) {
                 self.bundle_commonjs(&resolved_path)
                     .map_err(|e| JsError::from_opaque(JsValue::from(js_string!(e))))?
             } else {
                 js_code
             };
 
-            // Parse and load the module
-            let source = Source::from_bytes(final_code.as_bytes());
+            // Parse and load the module with its path for proper referrer tracking
+            // Star exports (export * from "...") are now handled natively by Boa
+            // with proper path tracking via Source::with_path()
+            let source = Source::from_bytes(esm_code.as_bytes()).with_path(&resolved_path);
             let mut ctx = context.borrow_mut();
             Module::parse(source, None, &mut *ctx)
         }
@@ -469,6 +490,13 @@ impl Runtime {
             .build()
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
+        // Increase runtime limits to match Node.js/V8 defaults
+        // This handles large module graphs (e.g., date-fns has 245 re-exports)
+        context.runtime_limits_mut().set_recursion_limit(16384);
+        context
+            .runtime_limits_mut()
+            .set_stack_size_limit(1024 * 1024); // 1MB
+
         // Register all boa_runtime extensions using tuple syntax
         // This gives us: console, setTimeout/setInterval, URL, TextEncoder/TextDecoder,
         // structuredClone, queueMicrotask, and fetch
@@ -520,7 +548,12 @@ impl Runtime {
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
         websocket::register_websocket_helpers(&mut context)
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
-        websocket::register_websocket_server(&mut context)
+
+        // Register path module (Node.js compatible)
+        path::register_path(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register Worker API (high-performance Web Workers)
+        worker::register_worker_api(&mut context)
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
         let transpiler = Transpiler::with_config(config.transpiler_config.clone());
@@ -817,12 +850,31 @@ impl Runtime {
         let source = Source::from_bytes(js_code.as_bytes());
         let result = self.context.eval(source);
 
-        // Run the event loop to completion
-        self.context
-            .run_jobs()
-            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+        // Run the event loop to completion, including waiting for workers
+        self.run_event_loop()?;
 
         result.map_err(|e| RuntimeError::JsError(e.to_string()))
+    }
+
+    /// Run the event loop until all work is complete (including workers)
+    fn run_event_loop(&mut self) -> RuntimeResult<()> {
+        loop {
+            // Run any pending jobs
+            self.context
+                .run_jobs()
+                .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+            // Check if there are active workers that should keep us alive
+            if !worker::has_active_workers() {
+                break;
+            }
+
+            // Small sleep to avoid busy-waiting, then run jobs again
+            // This allows timer callbacks and worker message polling to execute
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+
+        Ok(())
     }
 
     /// Run a TypeScript file with full event loop support
@@ -856,11 +908,17 @@ impl Runtime {
         let promise = module.load_link_evaluate(&mut self.context);
 
         // Run jobs to execute the module
-        let _ = self.context.run_jobs();
+        self.context
+            .run_jobs()
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
         // Check if the promise resolved successfully
         match promise.state() {
-            PromiseState::Fulfilled(_) => Ok(JsValue::undefined()),
+            PromiseState::Fulfilled(_) => {
+                // Module executed, now run event loop for workers/timers
+                self.run_event_loop()?;
+                Ok(JsValue::undefined())
+            }
             PromiseState::Rejected(err) => {
                 let err_str: JsString = err
                     .to_string(&mut self.context)

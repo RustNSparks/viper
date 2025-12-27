@@ -1,1491 +1,1012 @@
-/**
- * Viper TypeScript Runtime Type Definitions
- *
- * Similar to Bun and Deno, these types provide autocompletion and type checking
- * for Viper-specific APIs.
- */
-
-/// <reference lib="es2023" />
+// Viper Runtime Type Definitions
 
 // ============================================================================
-// Global Viper Runtime Information
+// URL API
+// ============================================================================
+
+interface URLSearchParams {
+  append(name: string, value: string): void;
+  delete(name: string): void;
+  get(name: string): string | null;
+  getAll(name: string): string[];
+  has(name: string): boolean;
+  set(name: string, value: string): void;
+  sort(): void;
+  toString(): string;
+  forEach(
+    callback: (value: string, key: string, parent: URLSearchParams) => void,
+  ): void;
+  keys(): IterableIterator<string>;
+  values(): IterableIterator<string>;
+  entries(): IterableIterator<[string, string]>;
+  [Symbol.iterator](): IterableIterator<[string, string]>;
+}
+
+interface URLSearchParamsConstructor {
+  new (
+    init?: string | Record<string, string> | string[][] | URLSearchParams,
+  ): URLSearchParams;
+  prototype: URLSearchParams;
+}
+
+interface URL {
+  hash: string;
+  host: string;
+  hostname: string;
+  href: string;
+  readonly origin: string;
+  password: string;
+  pathname: string;
+  port: string;
+  protocol: string;
+  search: string;
+  readonly searchParams: URLSearchParams;
+  username: string;
+  toString(): string;
+  toJSON(): string;
+}
+
+interface URLConstructor {
+  new (url: string, base?: string | URL): URL;
+  prototype: URL;
+}
+
+// ============================================================================
+// Fetch API
+// ============================================================================
+
+interface RequestInit {
+  method?: string;
+  headers?: HeadersInit;
+  body?: BodyInit | null;
+  mode?: RequestMode;
+  credentials?: RequestCredentials;
+  cache?: RequestCache;
+  redirect?: RequestRedirect;
+  referrer?: string;
+  referrerPolicy?: ReferrerPolicy;
+  integrity?: string;
+  keepalive?: boolean;
+  signal?: AbortSignal | null;
+}
+
+type HeadersInit = Headers | Record<string, string> | [string, string][];
+type BodyInit =
+  | string
+  | ArrayBuffer
+  | Uint8Array
+  | URLSearchParams
+  | FormData
+  | Blob;
+type RequestMode = "cors" | "navigate" | "no-cors" | "same-origin";
+type RequestCredentials = "include" | "omit" | "same-origin";
+type RequestCache =
+  | "default"
+  | "force-cache"
+  | "no-cache"
+  | "no-store"
+  | "only-if-cached"
+  | "reload";
+type RequestRedirect = "error" | "follow" | "manual";
+type ReferrerPolicy =
+  | ""
+  | "no-referrer"
+  | "no-referrer-when-downgrade"
+  | "origin"
+  | "origin-when-cross-origin"
+  | "same-origin"
+  | "strict-origin"
+  | "strict-origin-when-cross-origin"
+  | "unsafe-url";
+
+interface Headers {
+  append(name: string, value: string): void;
+  delete(name: string): void;
+  get(name: string): string | null;
+  has(name: string): boolean;
+  set(name: string, value: string): void;
+  forEach(
+    callback: (value: string, key: string, parent: Headers) => void,
+  ): void;
+  keys(): IterableIterator<string>;
+  values(): IterableIterator<string>;
+  entries(): IterableIterator<[string, string]>;
+  [Symbol.iterator](): IterableIterator<[string, string]>;
+}
+
+interface HeadersConstructor {
+  new (init?: HeadersInit): Headers;
+  prototype: Headers;
+}
+
+interface Request {
+  readonly method: string;
+  readonly url: string;
+  readonly headers: Headers;
+  readonly body: ReadableStream<Uint8Array> | null;
+  readonly bodyUsed: boolean;
+  readonly cache: RequestCache;
+  readonly credentials: RequestCredentials;
+  readonly destination: string;
+  readonly integrity: string;
+  readonly keepalive: boolean;
+  readonly mode: RequestMode;
+  readonly redirect: RequestRedirect;
+  readonly referrer: string;
+  readonly referrerPolicy: ReferrerPolicy;
+  readonly signal: AbortSignal;
+  clone(): Request;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  blob(): Promise<Blob>;
+  formData(): Promise<FormData>;
+  json(): Promise<any>;
+  text(): Promise<string>;
+}
+
+interface RequestConstructor {
+  new (input: string | URL | Request, init?: RequestInit): Request;
+  prototype: Request;
+}
+
+interface Response {
+  readonly headers: Headers;
+  readonly ok: boolean;
+  readonly redirected: boolean;
+  readonly status: number;
+  readonly statusText: string;
+  readonly type: ResponseType;
+  readonly url: string;
+  readonly body: ReadableStream<Uint8Array> | null;
+  readonly bodyUsed: boolean;
+  clone(): Response;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  blob(): Promise<Blob>;
+  formData(): Promise<FormData>;
+  json(): Promise<any>;
+  text(): Promise<string>;
+}
+
+interface ResponseConstructor {
+  new (body?: BodyInit | null, init?: ResponseInit): Response;
+  prototype: Response;
+  error(): Response;
+  redirect(url: string | URL, status?: number): Response;
+  json(data: any, init?: ResponseInit): Response;
+}
+
+interface ResponseInit {
+  headers?: HeadersInit;
+  status?: number;
+  statusText?: string;
+}
+
+type ResponseType =
+  | "basic"
+  | "cors"
+  | "default"
+  | "error"
+  | "opaque"
+  | "opaqueredirect";
+
+// ============================================================================
+// Blob & FormData
+// ============================================================================
+
+interface Blob {
+  readonly size: number;
+  readonly type: string;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  slice(start?: number, end?: number, contentType?: string): Blob;
+  stream(): ReadableStream<Uint8Array>;
+  text(): Promise<string>;
+}
+
+type BlobPart = string | ArrayBuffer | ArrayBufferView | Blob;
+
+interface BlobPropertyBag {
+  type?: string;
+  endings?: "native" | "transparent";
+}
+
+interface BlobConstructor {
+  new (blobParts?: BlobPart[], options?: BlobPropertyBag): Blob;
+  prototype: Blob;
+}
+
+interface FormData {
+  append(name: string, value: string | Blob, fileName?: string): void;
+  delete(name: string): void;
+  get(name: string): FormDataEntryValue | null;
+  getAll(name: string): FormDataEntryValue[];
+  has(name: string): boolean;
+  set(name: string, value: string | Blob, fileName?: string): void;
+  forEach(
+    callback: (
+      value: FormDataEntryValue,
+      key: string,
+      parent: FormData,
+    ) => void,
+  ): void;
+  keys(): IterableIterator<string>;
+  values(): IterableIterator<FormDataEntryValue>;
+  entries(): IterableIterator<[string, FormDataEntryValue]>;
+  [Symbol.iterator](): IterableIterator<[string, FormDataEntryValue]>;
+}
+
+interface FormDataConstructor {
+  new (): FormData;
+  prototype: FormData;
+}
+
+type FormDataEntryValue = string | File;
+
+interface File extends Blob {
+  readonly lastModified: number;
+  readonly name: string;
+}
+
+interface FilePropertyBag extends BlobPropertyBag {
+  lastModified?: number;
+}
+
+interface FileConstructor {
+  new (fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): File;
+  prototype: File;
+}
+
+// ============================================================================
+// Streams API
+// ============================================================================
+
+interface ReadableStream<R = any> {
+  readonly locked: boolean;
+  cancel(reason?: any): Promise<void>;
+  getReader(): ReadableStreamDefaultReader<R>;
+  tee(): [ReadableStream<R>, ReadableStream<R>];
+}
+
+interface ReadableStreamDefaultReader<R = any> {
+  readonly closed: Promise<undefined>;
+  cancel(reason?: any): Promise<void>;
+  read(): Promise<ReadableStreamReadResult<R>>;
+  releaseLock(): void;
+}
+
+type ReadableStreamReadResult<T> =
+  | { done: false; value: T }
+  | { done: true; value?: undefined };
+
+// ============================================================================
+// AbortController & AbortSignal
+// ============================================================================
+
+interface AbortController {
+  readonly signal: AbortSignal;
+  abort(reason?: any): void;
+}
+
+interface AbortControllerConstructor {
+  new (): AbortController;
+  prototype: AbortController;
+}
+
+interface AbortSignal extends EventTarget {
+  readonly aborted: boolean;
+  readonly reason: any;
+  onabort: ((this: AbortSignal, ev: Event) => any) | null;
+  throwIfAborted(): void;
+}
+
+interface AbortSignalConstructor {
+  prototype: AbortSignal;
+  abort(reason?: any): AbortSignal;
+  timeout(milliseconds: number): AbortSignal;
+}
+
+// ============================================================================
+// Events
+// ============================================================================
+
+interface Event {
+  readonly bubbles: boolean;
+  readonly cancelable: boolean;
+  readonly composed: boolean;
+  readonly currentTarget: EventTarget | null;
+  readonly defaultPrevented: boolean;
+  readonly eventPhase: number;
+  readonly isTrusted: boolean;
+  readonly target: EventTarget | null;
+  readonly timeStamp: number;
+  readonly type: string;
+  preventDefault(): void;
+  stopImmediatePropagation(): void;
+  stopPropagation(): void;
+}
+
+interface EventInit {
+  bubbles?: boolean;
+  cancelable?: boolean;
+  composed?: boolean;
+}
+
+interface EventConstructor {
+  new (type: string, eventInitDict?: EventInit): Event;
+  prototype: Event;
+}
+
+interface EventTarget {
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  dispatchEvent(event: Event): boolean;
+}
+
+interface EventTargetConstructor {
+  new (): EventTarget;
+  prototype: EventTarget;
+}
+
+interface EventListener {
+  (evt: Event): void;
+}
+
+interface EventListenerObject {
+  handleEvent(evt: Event): void;
+}
+
+type EventListenerOrEventListenerObject = EventListener | EventListenerObject;
+
+interface AddEventListenerOptions extends EventListenerOptions {
+  once?: boolean;
+  passive?: boolean;
+  signal?: AbortSignal;
+}
+
+interface EventListenerOptions {
+  capture?: boolean;
+}
+
+// ============================================================================
+// TextEncoder / TextDecoder
+// ============================================================================
+
+interface TextEncoder {
+  readonly encoding: string;
+  encode(input?: string): Uint8Array;
+  encodeInto(
+    source: string,
+    destination: Uint8Array,
+  ): { read: number; written: number };
+}
+
+interface TextEncoderConstructor {
+  new (): TextEncoder;
+  prototype: TextEncoder;
+}
+
+interface TextDecoder {
+  readonly encoding: string;
+  readonly fatal: boolean;
+  readonly ignoreBOM: boolean;
+  decode(
+    input?: ArrayBuffer | ArrayBufferView,
+    options?: TextDecodeOptions,
+  ): string;
+}
+
+interface TextDecoderOptions {
+  fatal?: boolean;
+  ignoreBOM?: boolean;
+}
+
+interface TextDecodeOptions {
+  stream?: boolean;
+}
+
+interface TextDecoderConstructor {
+  new (label?: string, options?: TextDecoderOptions): TextDecoder;
+  prototype: TextDecoder;
+}
+
+// ============================================================================
+// Structured Clone
+// ============================================================================
+
+interface StructuredSerializeOptions {
+  transfer?: Transferable[];
+}
+
+type Transferable = ArrayBuffer;
+
+// ============================================================================
+// WebSocket
+// ============================================================================
+
+interface WebSocket extends EventTarget {
+  readonly binaryType: BinaryType;
+  readonly bufferedAmount: number;
+  readonly extensions: string;
+  readonly protocol: string;
+  readonly readyState: number;
+  readonly url: string;
+  onclose: ((this: WebSocket, ev: CloseEvent) => any) | null;
+  onerror: ((this: WebSocket, ev: Event) => any) | null;
+  onmessage: ((this: WebSocket, ev: MessageEvent) => any) | null;
+  onopen: ((this: WebSocket, ev: Event) => any) | null;
+  close(code?: number, reason?: string): void;
+  send(data: string | ArrayBuffer | Blob | ArrayBufferView): void;
+  readonly CONNECTING: 0;
+  readonly OPEN: 1;
+  readonly CLOSING: 2;
+  readonly CLOSED: 3;
+}
+
+interface WebSocketConstructor {
+  new (url: string | URL, protocols?: string | string[]): WebSocket;
+  prototype: WebSocket;
+  readonly CONNECTING: 0;
+  readonly OPEN: 1;
+  readonly CLOSING: 2;
+  readonly CLOSED: 3;
+}
+
+type BinaryType = "arraybuffer" | "blob";
+
+interface CloseEvent extends Event {
+  readonly code: number;
+  readonly reason: string;
+  readonly wasClean: boolean;
+}
+
+interface MessageEvent<T = any> extends Event {
+  readonly data: T;
+  readonly lastEventId: string;
+  readonly origin: string;
+  readonly source: MessageEventSource | null;
+  readonly ports: readonly MessagePort[];
+}
+
+type MessageEventSource = Window | MessagePort | ServiceWorker;
+
+// ============================================================================
+// Worker API (High-Performance Web Workers)
+// ============================================================================
+
+interface WorkerOptions {
+  /** Module specifiers to load before the worker script */
+  preload?: string | string[];
+  /** Use reduced memory mode (slower but uses less RAM) */
+  smol?: boolean;
+  /** Whether this worker keeps the process alive (default: true) */
+  ref?: boolean;
+  /** Worker name for debugging */
+  name?: string;
+  /** Ignored for compatibility - Viper workers always support ES modules */
+  type?: "classic" | "module";
+}
+
+interface Worker extends EventTarget {
+  /** Unique thread identifier */
+  readonly threadId: number;
+
+  /** Send a message to the worker */
+  postMessage(message: any, transfer?: Transferable[]): void;
+  postMessage(message: any, options?: StructuredSerializeOptions): void;
+
+  /** Terminate the worker immediately */
+  terminate(): void;
+
+  /** Keep the process alive while this worker is running */
+  ref(): this;
+
+  /** Allow the process to exit even if this worker is still running */
+  unref(): this;
+
+  /** Called when the worker is ready to receive messages */
+  onopen: ((this: Worker, ev: Event) => any) | null;
+
+  /** Called when a message is received from the worker */
+  onmessage: ((this: Worker, ev: MessageEvent) => any) | null;
+
+  /** Called when an error occurs in the worker */
+  onerror: ((this: Worker, ev: ErrorEvent) => any) | null;
+
+  /** Called when the worker is closed */
+  onclose: ((this: Worker, ev: CloseEvent) => any) | null;
+
+  addEventListener<K extends keyof WorkerEventMap>(
+    type: K,
+    listener: (this: Worker, ev: WorkerEventMap[K]) => any,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+
+  removeEventListener<K extends keyof WorkerEventMap>(
+    type: K,
+    listener: (this: Worker, ev: WorkerEventMap[K]) => any,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions,
+  ): void;
+}
+
+interface WorkerEventMap {
+  open: Event;
+  message: MessageEvent;
+  messageerror: MessageEvent;
+  error: ErrorEvent;
+  close: CloseEvent;
+}
+
+interface WorkerConstructor {
+  new (scriptURL: string | URL, options?: WorkerOptions): Worker;
+  prototype: Worker;
+}
+
+interface ErrorEvent extends Event {
+  readonly message: string;
+  readonly filename: string;
+  readonly lineno: number;
+  readonly colno: number;
+  readonly error: any;
+}
+
+// ============================================================================
+// MessageChannel & MessagePort
+// ============================================================================
+
+interface MessageChannel {
+  readonly port1: MessagePort;
+  readonly port2: MessagePort;
+}
+
+interface MessageChannelConstructor {
+  new (): MessageChannel;
+  prototype: MessageChannel;
+}
+
+interface MessagePort extends EventTarget {
+  onmessage: ((this: MessagePort, ev: MessageEvent) => any) | null;
+  onmessageerror: ((this: MessagePort, ev: MessageEvent) => any) | null;
+
+  close(): void;
+  postMessage(message: any, transfer?: Transferable[]): void;
+  postMessage(message: any, options?: StructuredSerializeOptions): void;
+  start(): void;
+
+  addEventListener<K extends keyof MessagePortEventMap>(
+    type: K,
+    listener: (this: MessagePort, ev: MessagePortEventMap[K]) => any,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+
+  removeEventListener<K extends keyof MessagePortEventMap>(
+    type: K,
+    listener: (this: MessagePort, ev: MessagePortEventMap[K]) => any,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions,
+  ): void;
+}
+
+interface MessagePortEventMap {
+  message: MessageEvent;
+  messageerror: MessageEvent;
+}
+
+// ============================================================================
+// Worker Global Scope (inside workers)
+// ============================================================================
+
+interface DedicatedWorkerGlobalScope extends WorkerGlobalScope {
+  readonly name: string;
+
+  onmessage:
+    | ((this: DedicatedWorkerGlobalScope, ev: MessageEvent) => any)
+    | null;
+  onmessageerror:
+    | ((this: DedicatedWorkerGlobalScope, ev: MessageEvent) => any)
+    | null;
+
+  close(): void;
+  postMessage(message: any, transfer?: Transferable[]): void;
+  postMessage(message: any, options?: StructuredSerializeOptions): void;
+}
+
+interface WorkerGlobalScope extends EventTarget {
+  readonly self: WorkerGlobalScope;
+  readonly location: WorkerLocation;
+
+  onerror: ((this: WorkerGlobalScope, ev: ErrorEvent) => any) | null;
+}
+
+interface WorkerLocation {
+  readonly href: string;
+  readonly origin: string;
+  readonly protocol: string;
+  readonly host: string;
+  readonly hostname: string;
+  readonly port: string;
+  readonly pathname: string;
+  readonly search: string;
+  readonly hash: string;
+}
+
+// ============================================================================
+// worker_threads compatibility (Node.js style)
+// ============================================================================
+
+interface WorkerThreads {
+  readonly isMainThread: boolean;
+  readonly parentPort: MessagePort | null;
+  readonly workerData: any;
+  readonly Worker: WorkerConstructor;
+  readonly threadId: number;
+
+  setEnvironmentData(key: any, value: any): void;
+  getEnvironmentData(key: any): any;
+}
+
+// ============================================================================
+// Console API
+// ============================================================================
+
+interface Console {
+  log(...args: any[]): void;
+  error(...args: any[]): void;
+  warn(...args: any[]): void;
+  info(...args: any[]): void;
+  debug(...args: any[]): void;
+  trace(...args: any[]): void;
+  dir(obj: any): void;
+  table(data: any): void;
+  time(label?: string): void;
+  timeEnd(label?: string): void;
+  timeLog(label?: string, ...args: any[]): void;
+  count(label?: string): void;
+  countReset(label?: string): void;
+  group(...args: any[]): void;
+  groupCollapsed(...args: any[]): void;
+  groupEnd(): void;
+  clear(): void;
+  assert(condition?: boolean, ...args: any[]): void;
+}
+
+// ============================================================================
+// Path Module Types
+// ============================================================================
+
+interface ParsedPath {
+  root: string;
+  dir: string;
+  base: string;
+  ext: string;
+  name: string;
+}
+
+interface FormatInputPathObject {
+  root?: string;
+  dir?: string;
+  base?: string;
+  name?: string;
+  ext?: string;
+}
+
+interface PlatformPath {
+  sep: string;
+  delimiter: string;
+  join(...paths: string[]): string;
+  resolve(...paths: string[]): string;
+  normalize(path: string): string;
+  dirname(path: string): string;
+  basename(path: string, ext?: string): string;
+  extname(path: string): string;
+  isAbsolute(path: string): boolean;
+  relative(from: string, to: string): string;
+  parse(path: string): ParsedPath;
+  format(pathObject: FormatInputPathObject): string;
+  toNamespacedPath(path: string): string;
+  matchesGlob(path: string, pattern: string): boolean;
+  posix: PlatformPath;
+  win32: PlatformPath;
+}
+
+// ============================================================================
+// Process Object
+// ============================================================================
+
+interface ProcessVersions {
+  viper: string;
+  boa: string;
+  oxc: string;
+}
+
+interface Process {
+  argv: string[];
+  exit(code?: number): never;
+  cwd(): string;
+  env: Record<string, string | undefined>;
+  pid: number;
+  ppid: number;
+  platform: "win32" | "darwin" | "linux" | "unknown";
+  arch: "x64" | "arm64" | "ia32" | "arm" | "unknown";
+  version: string;
+  versions: ProcessVersions;
+  title: string;
+  execPath: string;
+  hrtime: {
+    (prev?: [number, number]): [number, number];
+    bigint(): bigint;
+  };
+  memoryUsage(): {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+    arrayBuffers: number;
+  };
+  cpuUsage(): { user: number; system: number };
+  uptime(): number;
+  nextTick(callback: (...args: any[]) => void, ...args: any[]): void;
+  stdout: { write(data: string): boolean; isTTY: boolean };
+  stderr: { write(data: string): boolean; isTTY: boolean };
+  stdin: { isTTY: boolean };
+  on(event: string, listener: (...args: any[]) => void): Process;
+  once(event: string, listener: (...args: any[]) => void): Process;
+  off(event: string, listener: (...args: any[]) => void): Process;
+  emit(event: string, ...args: any[]): boolean;
+}
+
+// ============================================================================
+// Crypto API
+// ============================================================================
+
+interface ViperCrypto {
+  randomUUID(): string;
+  getRandomValues<T extends ArrayBufferView>(array: T): T;
+  randomBytes(size: number): Uint8Array;
+  subtle: {
+    digest(algorithm: string, data: ArrayBuffer): Promise<ArrayBuffer>;
+    encrypt(algorithm: any, key: any, data: ArrayBuffer): Promise<ArrayBuffer>;
+    decrypt(algorithm: any, key: any, data: ArrayBuffer): Promise<ArrayBuffer>;
+    sign(algorithm: any, key: any, data: ArrayBuffer): Promise<ArrayBuffer>;
+    verify(
+      algorithm: any,
+      key: any,
+      signature: ArrayBuffer,
+      data: ArrayBuffer,
+    ): Promise<boolean>;
+    generateKey(
+      algorithm: any,
+      extractable: boolean,
+      keyUsages: string[],
+    ): Promise<any>;
+    importKey(
+      format: string,
+      keyData: any,
+      algorithm: any,
+      extractable: boolean,
+      keyUsages: string[],
+    ): Promise<any>;
+    exportKey(format: string, key: any): Promise<any>;
+  };
+}
+
+// ============================================================================
+// File System API
+// ============================================================================
+
+interface ViperFile {
+  text(): Promise<string>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  exists(): Promise<boolean>;
+}
+
+interface FileStat {
+  isFile: boolean;
+  isDirectory: boolean;
+  size: number;
+  mtime: number;
+}
+
+// ============================================================================
+// Viper Namespace
+// ============================================================================
+
+interface SpawnResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+interface SpawnOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  shell?: boolean;
+}
+
+interface ServeOptions {
+  port?: number;
+  hostname?: string;
+  fetch: (request: Request) => Response | Promise<Response>;
+}
+
+interface ServerInfo {
+  port: number;
+  hostname: string;
+}
+
+interface ViperNamespace {
+  spawn(
+    command: string,
+    args?: string[],
+    options?: SpawnOptions,
+  ): Promise<SpawnResult>;
+  exec(command: string): Promise<SpawnResult>;
+  serve(options: ServeOptions): ServerInfo;
+}
+
+// ============================================================================
+// Module Declarations
+// ============================================================================
+
+declare module "path" {
+  export const sep: string;
+  export const delimiter: string;
+  export function join(...paths: string[]): string;
+  export function resolve(...paths: string[]): string;
+  export function normalize(path: string): string;
+  export function dirname(path: string): string;
+  export function basename(path: string, ext?: string): string;
+  export function extname(path: string): string;
+  export function isAbsolute(path: string): boolean;
+  export function relative(from: string, to: string): string;
+  export function parse(path: string): ParsedPath;
+  export function format(pathObject: FormatInputPathObject): string;
+  export function toNamespacedPath(path: string): string;
+  export function matchesGlob(path: string, pattern: string): boolean;
+  export const posix: PlatformPath;
+  export const win32: PlatformPath;
+  const path: PlatformPath;
+  export default path;
+}
+
+declare module "node:path" {
+  export * from "path";
+  export { default } from "path";
+}
+
+// ============================================================================
+// Global Declarations
 // ============================================================================
 
 declare global {
-  /**
-   * The version of the Viper runtime
-   */
-  const __VIPER_VERSION__: string;
+  // Console
+  var console: Console;
 
-  /**
-   * The name of the runtime
-   */
-  const __VIPER_RUNTIME__: "Viper";
+  // URL
+  var URL: URLConstructor;
+  var URLSearchParams: URLSearchParamsConstructor;
 
-  // ============================================================================
-  // File System API
-  // ============================================================================
+  // Fetch API
+  function fetch(
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response>;
+  var Headers: HeadersConstructor;
+  var Request: RequestConstructor;
+  var Response: ResponseConstructor;
 
-  /**
-   * A reference to a file that lazily loads contents
-   * Similar to Bun's BunFile
-   */
-  interface ViperFile {
-    /**
-     * The absolute path to the file
-     */
-    readonly path: string;
+  // Blob & FormData
+  var Blob: BlobConstructor;
+  var File: FileConstructor;
+  var FormData: FormDataConstructor;
 
-    /**
-     * The MIME type of the file (auto-detected from extension)
-     */
-    readonly type: string;
+  // Text encoding
+  var TextEncoder: TextEncoderConstructor;
+  var TextDecoder: TextDecoderConstructor;
 
-    /**
-     * Read the file contents as a UTF-8 string
-     * @returns A promise that resolves to the file contents
-     */
-    text(): Promise<string>;
+  // Events
+  var Event: EventConstructor;
+  var EventTarget: EventTargetConstructor;
 
-    /**
-     * Read and parse the file contents as JSON
-     * @returns A promise that resolves to the parsed JSON data
-     */
-    json<T = any>(): Promise<T>;
+  // Abort
+  var AbortController: AbortControllerConstructor;
+  var AbortSignal: AbortSignalConstructor;
 
-    /**
-     * Check if the file exists
-     * @returns A promise that resolves to true if the file exists
-     */
-    exists(): Promise<boolean>;
+  // WebSocket
+  var WebSocket: WebSocketConstructor;
 
-    /**
-     * Get the size of the file in bytes
-     * @returns A promise that resolves to the file size
-     */
-    size(): Promise<number>;
+  // Worker API
+  var Worker: WorkerConstructor;
+  var MessageChannel: MessageChannelConstructor;
+  var MessagePort: MessagePort;
 
-    /**
-     * Delete the file
-     * @returns A promise that resolves when the file is deleted
-     */
-    delete(): Promise<void>;
-
-    /**
-     * Get file stats
-     * @returns A promise that resolves to file statistics
-     */
-    stat(): Promise<ViperFileStats>;
-
-    /**
-     * Create a writer for incremental file writing
-     * @param options Optional configuration for the writer
-     * @returns A FileSink for writing data incrementally
-     */
-    writer(options?: FileSinkOptions): ViperFileSink;
-  }
-
-  /**
-   * File statistics
-   */
-  interface ViperFileStats {
-    /**
-     * Size in bytes
-     */
-    size: number;
-
-    /**
-     * Whether this is a file
-     */
-    isFile: boolean;
-
-    /**
-     * Whether this is a directory
-     */
-    isDirectory: boolean;
-
-    /**
-     * Whether this is a symbolic link
-     */
-    isSymlink: boolean;
-  }
-
-  /**
-   * Options for creating a FileSink
-   */
-  interface FileSinkOptions {
-    /**
-     * The high water mark for buffering (in bytes)
-     * Default: 16384 (16KB)
-     */
-    highWaterMark?: number;
-  }
-
-  /**
-   * Incremental file writer with buffering
-   * Similar to Bun's FileSink
-   */
-  interface ViperFileSink {
-    /**
-     * Write a chunk of data to the buffer
-     * @param chunk String, ArrayBuffer, or TypedArray to write
-     */
-    write(chunk: string | ArrayBuffer | ArrayBufferView): void;
-
-    /**
-     * Flush the buffer to disk
-     * @returns A promise that resolves when the flush is complete
-     */
-    flush(): Promise<void>;
-
-    /**
-     * Flush and close the file
-     * @returns A promise that resolves to the total bytes written
-     */
-    end(): Promise<number>;
-  }
-
-  /**
-   * Create a file reference
-   * @param path The path to the file
-   * @param options Optional file options
-   * @returns A ViperFile reference
-   *
-   * @example
-   * ```ts
-   * const f = file("data.json");
-   * const data = await f.json();
-   * console.log(data);
-   * ```
-   */
-  function file(path: string, options?: { type?: string }): ViperFile;
-
-  /**
-   * Write data to a file
-   *
-   * @param destination The destination path or ViperFile
-   * @param data The data to write (string, ArrayBuffer, TypedArray, or another ViperFile)
-   * @returns A promise that resolves to the number of bytes written
-   *
-   * @example
-   * ```ts
-   * // Write a string
-   * await write("output.txt", "Hello, Viper!");
-   *
-   * // Write JSON
-   * await write("data.json", JSON.stringify({ name: "Viper" }));
-   *
-   * // Copy a file
-   * await write(file("dest.txt"), file("source.txt"));
-   * ```
-   */
-  function write(
-    destination: string | ViperFile,
-    data: string | ArrayBuffer | ArrayBufferView | ViperFile,
-  ): Promise<number>;
-
-  // ============================================================================
-  // JSX Runtime
-  // ============================================================================
-
-  /**
-   * JSX element creation function (classic JSX runtime)
-   * @internal
-   */
-  function __viper_jsx(
-    type: string | Function,
-    props: Record<string, any> | null,
-    ...children: any[]
-  ): any;
-
-  /**
-   * JSX fragment function
-   * @internal
-   */
-  function __viper_fragment(
-    props: Record<string, any> | null,
-    ...children: any[]
-  ): any;
-
-  /**
-   * Render a JSX element to an HTML string
-   * @param element The JSX element to render
-   * @returns The rendered HTML string
-   *
-   * @example
-   * ```tsx
-   * const html = renderToString(<div className="greeting">Hello!</div>);
-   * console.log(html); // <div class="greeting">Hello!</div>
-   * ```
-   */
-  function renderToString(element: any): string;
-
-  // ============================================================================
-  // Standard Web APIs
-  // ============================================================================
-
-  // Console API
-  interface Console {
-    log(...data: any[]): void;
-    info(...data: any[]): void;
-    warn(...data: any[]): void;
-    error(...data: any[]): void;
-    debug(...data: any[]): void;
-    trace(...data: any[]): void;
-    assert(condition?: boolean, ...data: any[]): void;
-    clear(): void;
-    count(label?: string): void;
-    countReset(label?: string): void;
-    group(...data: any[]): void;
-    groupCollapsed(...data: any[]): void;
-    groupEnd(): void;
-    time(label?: string): void;
-    timeLog(label?: string, ...data: any[]): void;
-    timeEnd(label?: string): void;
-  }
-
-  const console: Console;
-
-  // Timer functions
+  // Timers
   function setTimeout(
     callback: (...args: any[]) => void,
     ms?: number,
     ...args: any[]
   ): number;
-  function clearTimeout(id: number): void;
   function setInterval(
     callback: (...args: any[]) => void,
     ms?: number,
     ...args: any[]
   ): number;
-  function clearInterval(id: number): void;
-
-  // Microtask
+  function clearTimeout(id?: number): void;
+  function clearInterval(id?: number): void;
   function queueMicrotask(callback: () => void): void;
 
-  // URL API
-  class URL {
-    constructor(url: string, base?: string | URL);
-    href: string;
-    origin: string;
-    protocol: string;
-    username: string;
-    password: string;
-    host: string;
-    hostname: string;
-    port: string;
-    pathname: string;
-    search: string;
-    searchParams: URLSearchParams;
-    hash: string;
-    toString(): string;
-    toJSON(): string;
-  }
-
-  class URLSearchParams {
-    constructor(
-      init?:
-        | string
-        | URLSearchParams
-        | Record<string, string>
-        | [string, string][],
-    );
-    append(name: string, value: string): void;
-    delete(name: string): void;
-    get(name: string): string | null;
-    getAll(name: string): string[];
-    has(name: string): boolean;
-    set(name: string, value: string): void;
-    sort(): void;
-    toString(): string;
-    forEach(
-      callback: (value: string, key: string, parent: URLSearchParams) => void,
-    ): void;
-    [Symbol.iterator](): IterableIterator<[string, string]>;
-    entries(): IterableIterator<[string, string]>;
-    keys(): IterableIterator<string>;
-    values(): IterableIterator<string>;
-  }
-
-  // Text Encoding API
-  class TextEncoder {
-    readonly encoding: string;
-    encode(input?: string): Uint8Array;
-  }
-
-  class TextDecoder {
-    constructor(
-      label?: string,
-      options?: { fatal?: boolean; ignoreBOM?: boolean },
-    );
-    readonly encoding: string;
-    readonly fatal: boolean;
-    readonly ignoreBOM: boolean;
-    decode(input?: BufferSource, options?: { stream?: boolean }): string;
-  }
-
   // Structured Clone
-  function structuredClone<T>(value: T, options?: { transfer?: any[] }): T;
+  function structuredClone<T>(
+    value: T,
+    options?: StructuredSerializeOptions,
+  ): T;
 
-  // Global object reference (Node.js compatibility)
-  const global: typeof globalThis;
+  // Path module (global)
+  var path: PlatformPath;
 
-  // ============================================================================
-  // Process API (Node.js compatible)
-  // ============================================================================
+  // Process object
+  var process: Process;
 
-  /**
-   * Process object providing information about the current process
-   */
-  const process: {
-    /**
-     * Command-line arguments passed to the process
-     * First element is the executable path, second is the script path
-     */
-    readonly argv: string[];
+  // Crypto API
+  var crypto: ViperCrypto;
 
-    /**
-     * Exit the process with an optional exit code
-     * @param code Exit code (default: 0)
-     */
-    exit(code?: number): never;
-
-    /**
-     * Get the current working directory
-     */
-    cwd(): string;
-
-    /**
-     * Environment variables
-     */
-    readonly env: Record<string, string | undefined>;
-
-    /**
-     * Process ID
-     */
-    readonly pid: number;
-
-    /**
-     * Parent process ID
-     */
-    readonly ppid: number;
-
-    /**
-     * Operating system platform
-     * 'win32' | 'darwin' | 'linux' | 'unknown'
-     */
-    readonly platform: string;
-
-    /**
-     * CPU architecture
-     * 'x64' | 'arm64' | 'ia32' | 'arm' | 'unknown'
-     */
-    readonly arch: string;
-
-    /**
-     * Viper version string (prefixed with 'v')
-     */
-    readonly version: string;
-
-    /**
-     * Version information for runtime components
-     */
-    readonly versions: {
-      viper: string;
-      boa: string;
-      oxc: string;
-    };
-
-    /**
-     * Process title
-     */
-    readonly title: string;
-
-    /**
-     * Path to the executable
-     */
-    readonly execPath: string;
-
-    /**
-     * High-resolution time
-     * @param prev Optional previous hrtime to calculate difference
-     * @returns [seconds, nanoseconds]
-     */
-    hrtime(prev?: [number, number]): [number, number];
-
-    /**
-     * High-resolution time as BigInt nanoseconds
-     */
-    hrtime: {
-      (prev?: [number, number]): [number, number];
-      bigint(): bigint;
-    };
-
-    /**
-     * Get memory usage (approximate)
-     */
-    memoryUsage(): {
-      rss: number;
-      heapTotal: number;
-      heapUsed: number;
-      external: number;
-      arrayBuffers: number;
-    };
-
-    /**
-     * Get CPU usage
-     */
-    cpuUsage(): { user: number; system: number };
-
-    /**
-     * Get process uptime in seconds
-     */
-    uptime(): number;
-
-    /**
-     * Schedule a callback to run before the next event loop iteration
-     * @param callback Function to call
-     * @param args Arguments to pass to the callback
-     */
-    nextTick<T extends any[]>(callback: (...args: T) => void, ...args: T): void;
-
-    /**
-     * Standard output stream
-     */
-    readonly stdout: {
-      write(data: string): boolean;
-      readonly isTTY: boolean;
-    };
-
-    /**
-     * Standard error stream
-     */
-    readonly stderr: {
-      write(data: string): boolean;
-      readonly isTTY: boolean;
-    };
-
-    /**
-     * Standard input stream
-     */
-    readonly stdin: {
-      readonly isTTY: boolean;
-    };
-
-    /**
-     * Add an event listener
-     */
-    on(event: string, listener: (...args: any[]) => void): typeof process;
-
-    /**
-     * Add a one-time event listener
-     */
-    once(event: string, listener: (...args: any[]) => void): typeof process;
-
-    /**
-     * Remove an event listener
-     */
-    off(event: string, listener: (...args: any[]) => void): typeof process;
-
-    /**
-     * Emit an event
-     */
-    emit(event: string, ...args: any[]): boolean;
+  // Viper namespace
+  var Viper: ViperNamespace & {
+    /** true if running in the main thread, false in workers */
+    isMainThread: boolean;
   };
 
-  // ============================================================================
-  // Crypto API (Web Crypto compatible)
-  // ============================================================================
-
-  /**
-   * Cryptographic functionality
-   */
-  const crypto: {
-    /**
-     * Generate a random UUID v4
-     * @returns A random UUID string
-     *
-     * @example
-     * ```ts
-     * const id = crypto.randomUUID();
-     * // "550e8400-e29b-41d4-a716-446655440000"
-     * ```
-     */
-    randomUUID(): string;
-
-    /**
-     * Fill a typed array with cryptographically random values
-     * @param array The typed array to fill
-     * @returns The same array, filled with random values
-     *
-     * @example
-     * ```ts
-     * const bytes = new Uint8Array(16);
-     * crypto.getRandomValues(bytes);
-     * ```
-     */
-    getRandomValues<T extends ArrayBufferView>(array: T): T;
-
-    /**
-     * Generate random bytes (Node.js compatible)
-     * @param size Number of bytes to generate
-     * @returns A Uint8Array with random bytes
-     *
-     * @example
-     * ```ts
-     * const bytes = crypto.randomBytes(32);
-     * ```
-     */
-    randomBytes(size: number): Uint8Array;
-
-    /**
-     * Web Crypto subtle interface (partial implementation)
-     */
-    readonly subtle: {
-      digest(algorithm: string, data: BufferSource): Promise<ArrayBuffer>;
-      encrypt(
-        algorithm: any,
-        key: CryptoKey,
-        data: BufferSource,
-      ): Promise<ArrayBuffer>;
-      decrypt(
-        algorithm: any,
-        key: CryptoKey,
-        data: BufferSource,
-      ): Promise<ArrayBuffer>;
-      sign(
-        algorithm: any,
-        key: CryptoKey,
-        data: BufferSource,
-      ): Promise<ArrayBuffer>;
-      verify(
-        algorithm: any,
-        key: CryptoKey,
-        signature: BufferSource,
-        data: BufferSource,
-      ): Promise<boolean>;
-      generateKey(
-        algorithm: any,
-        extractable: boolean,
-        keyUsages: string[],
-      ): Promise<CryptoKey | CryptoKeyPair>;
-      importKey(
-        format: string,
-        keyData: BufferSource,
-        algorithm: any,
-        extractable: boolean,
-        keyUsages: string[],
-      ): Promise<CryptoKey>;
-      exportKey(format: string, key: CryptoKey): Promise<ArrayBuffer>;
-    };
-  };
-
-  /**
-   * CryptoKey interface (Web Crypto)
-   */
-  interface CryptoKey {
-    readonly type: string;
-    readonly extractable: boolean;
-    readonly algorithm: any;
-    readonly usages: string[];
-  }
-
-  /**
-   * CryptoKeyPair interface (Web Crypto)
-   */
-  interface CryptoKeyPair {
-    readonly publicKey: CryptoKey;
-    readonly privateKey: CryptoKey;
-  }
-
-  // ============================================================================
-  // Fetch API
-  // ============================================================================
-
-  /**
-   * Fetch a resource from the network
-   *
-   * @param input URL string or Request object
-   * @param init Optional request configuration
-   * @returns A promise that resolves to a Response
-   *
-   * @example
-   * ```ts
-   * // Simple GET request
-   * const response = await fetch("https://api.example.com/data");
-   * const data = await response.json();
-   *
-   * // POST request with JSON body
-   * const response = await fetch("https://api.example.com/users", {
-   *   method: "POST",
-   *   headers: { "Content-Type": "application/json" },
-   *   body: JSON.stringify({ name: "Alice" })
-   * });
-   *
-   * // Using Request object
-   * const request = new Request("https://api.example.com/data", {
-   *   method: "GET",
-   *   headers: { "Authorization": "Bearer token" }
-   * });
-   * const response = await fetch(request);
-   * ```
-   */
-  function fetch(
-    input: string | Request,
-    init?: RequestInit,
-  ): Promise<Response>;
-
-  // ============================================================================
-  // Web API: Headers
-  // ============================================================================
-
-  /**
-   * HTTP Headers interface (Web API)
-   */
-  class Headers {
-    constructor(init?: HeadersInit);
-
-    /**
-     * Append a value to an existing header, or create a new header
-     */
-    append(name: string, value: string): void;
-
-    /**
-     * Delete a header
-     */
-    delete(name: string): void;
-
-    /**
-     * Get a header value
-     */
-    get(name: string): string | null;
-
-    /**
-     * Check if a header exists
-     */
-    has(name: string): boolean;
-
-    /**
-     * Set a header value (replaces existing)
-     */
-    set(name: string, value: string): void;
-
-    /**
-     * Iterate over all headers
-     */
-    forEach(
-      callback: (value: string, key: string, parent: Headers) => void,
-    ): void;
-
-    /**
-     * Get an iterator over header entries
-     */
-    entries(): IterableIterator<[string, string]>;
-
-    /**
-     * Get an iterator over header names
-     */
-    keys(): IterableIterator<string>;
-
-    /**
-     * Get an iterator over header values
-     */
-    values(): IterableIterator<string>;
-
-    [Symbol.iterator](): IterableIterator<[string, string]>;
-  }
-
-  type HeadersInit = Headers | Record<string, string> | [string, string][];
-
-  // ============================================================================
-  // Web API: Request
-  // ============================================================================
-
-  /**
-   * HTTP Request interface (Web API)
-   */
-  class Request {
-    constructor(input: string | Request, init?: RequestInit);
-
-    /**
-     * The request URL
-     */
-    readonly url: string;
-
-    /**
-     * The HTTP method
-     */
-    readonly method: string;
-
-    /**
-     * Request headers
-     */
-    readonly headers: Headers;
-
-    /**
-     * URL parameters extracted by the router
-     */
-    readonly params: Record<string, string>;
-
-    /**
-     * Query string parameters parsed from the URL
-     */
-    readonly query: Record<string, string>;
-
-    /**
-     * The request body
-     */
-    readonly body: any;
-
-    /**
-     * Read body as text
-     */
-    text(): Promise<string>;
-
-    /**
-     * Read body as JSON
-     */
-    json<T = any>(): Promise<T>;
-
-    /**
-     * Read body as FormData
-     */
-    formData(): Promise<Map<string, string>>;
-
-    /**
-     * Clone the request
-     */
-    clone(): Request;
-  }
-
-  interface RequestInit {
-    /**
-     * HTTP method
-     */
-    method?: string;
-
-    /**
-     * Request headers
-     */
-    headers?: HeadersInit;
-
-    /**
-     * Request body
-     */
-    body?: string | ArrayBuffer | ArrayBufferView | null;
-
-    /**
-     * URL parameters (set by router)
-     */
-    params?: Record<string, string>;
-  }
-
-  // ============================================================================
-  // Web API: Response
-  // ============================================================================
-
-  /**
-   * HTTP Response interface (Web API)
-   */
-  class Response {
-    constructor(body?: BodyInit | null, init?: ResponseInit);
-
-    /**
-     * HTTP status code
-     */
-    readonly status: number;
-
-    /**
-     * HTTP status text
-     */
-    readonly statusText: string;
-
-    /**
-     * Response headers
-     */
-    readonly headers: Headers;
-
-    /**
-     * Whether the response was successful (status 200-299)
-     */
-    readonly ok: boolean;
-
-    /**
-     * The response body
-     */
-    readonly body: any;
-
-    /**
-     * Read body as text
-     */
-    text(): Promise<string>;
-
-    /**
-     * Read body as JSON
-     */
-    json<T = any>(): Promise<T>;
-
-    /**
-     * Clone the response
-     */
-    clone(): Response;
-
-    /**
-     * Create a JSON response
-     * @param data Data to serialize as JSON
-     * @param init Optional response init
-     */
-    static json(data: any, init?: ResponseInit): Response;
-
-    /**
-     * Create a redirect response
-     * @param url URL to redirect to
-     * @param status HTTP status code (default: 302)
-     */
-    static redirect(url: string, status?: number): Response;
-
-    /**
-     * Create an error response
-     */
-    static error(): Response;
-  }
-
-  interface ResponseInit {
-    /**
-     * HTTP status code
-     */
-    status?: number;
-
-    /**
-     * HTTP status text
-     */
-    statusText?: string;
-
-    /**
-     * Response headers
-     */
-    headers?: HeadersInit;
-  }
-
-  type BodyInit = string | ArrayBuffer | ArrayBufferView | null;
-
-  // ============================================================================
-  // Viper Namespace
-  // ============================================================================
-
-  /**
-   * Viper namespace containing runtime-specific APIs
-   */
-  namespace Viper {
-    // ========================================================================
-    // Router API
-    // ========================================================================
-
-    /**
-     * Route handler function
-     */
-    type RouteHandler = (request: Request) => Response | Promise<Response>;
-
-    /**
-     * Middleware function
-     * Return a Response to short-circuit, or undefined to continue
-     */
-    type MiddlewareHandler = (request: Request) => Response | void;
-
-    /**
-     * Bun-like HTTP Router
-     *
-     * @example
-     * ```ts
-     * const router = new Viper.Router();
-     *
-     * router.get("/", () => new Response("Home"));
-     * router.get("/users/:id", (req) => {
-     *   return Response.json({ id: req.params.id });
-     * });
-     *
-     * Viper.serve({ port: 3000, fetch: router.fetch });
-     * ```
-     */
-    class Router {
-      constructor();
-
-      /**
-       * The fetch handler bound to this router instance.
-       * Pass this to Viper.serve() as the fetch handler.
-       */
-      readonly fetch: RouteHandler;
-
-      /**
-       * Add middleware that runs before every request
-       * @param handler Middleware function
-       */
-      use(handler: MiddlewareHandler): this;
-
-      /**
-       * Register a GET route
-       * @param path URL path pattern (supports :param and * wildcard)
-       * @param handler Route handler
-       */
-      get(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register a POST route
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      post(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register a PUT route
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      put(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register a DELETE route
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      delete(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register a PATCH route
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      patch(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register a HEAD route
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      head(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register an OPTIONS route
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      options(path: string, handler: RouteHandler): this;
-
-      /**
-       * Register a route that matches all HTTP methods
-       * @param path URL path pattern
-       * @param handler Route handler
-       */
-      all(path: string, handler: RouteHandler): this;
-
-      /**
-       * Group routes under a common prefix
-       * @param prefix URL prefix for all routes in the group
-       * @param callback Function that receives a sub-router
-       */
-      group(prefix: string, callback: (router: Router) => void): this;
-
-      /**
-       * Handle an incoming request (internal)
-       * @param request The incoming request
-       */
-      handle(request: Request): Response;
-    }
-
-    // ========================================================================
-    // Server API
-    // ========================================================================
-
-    /**
-     * Server configuration options
-     */
-    interface ServeOptions {
-      /**
-       * The port to listen on
-       * @default 3000
-       */
-      port?: number;
-
-      /**
-       * The hostname to bind to
-       * @default "127.0.0.1"
-       */
-      hostname?: string;
-
-      /**
-       * Request handler function
-       * Called for each incoming HTTP request
-       */
-      fetch: RouteHandler;
-    }
-
-    /**
-     * Start an HTTP server
-     *
-     * Similar to Bun.serve(), this function starts a fast HTTP server
-     * powered by Hyper on a single thread for maximum performance.
-     *
-     * @param options Server configuration
-     *
-     * @example
-     * ```ts
-     * // Simple server
-     * Viper.serve({
-     *   port: 3000,
-     *   fetch(request) {
-     *     return new Response("Hello from Viper!");
-     *   }
-     * });
-     * ```
-     *
-     * @example
-     * ```ts
-     * // With router
-     * const router = new Viper.Router();
-     * router.get("/", () => new Response("Home"));
-     * router.get("/api/users/:id", (req) => {
-     *   return Response.json({ id: req.params.id });
-     * });
-     *
-     * Viper.serve({ port: 8080, fetch: router.fetch });
-     * ```
-     */
-    function serve(options: ServeOptions): void;
-
-    // ========================================================================
-    // File System API
-    // ========================================================================
-
-    /**
-     * Create a file reference
-     * @param path Path to the file
-     * @param options Optional file options
-     *
-     * @example
-     * ```ts
-     * const f = Viper.file("data.json");
-     * const data = await f.json();
-     * ```
-     */
-    function file(path: string, options?: { type?: string }): ViperFile;
-
-    /**
-     * Write data to a file
-     * @param destination Path or ViperFile to write to
-     * @param data Data to write
-     *
-     * @example
-     * ```ts
-     * await Viper.write("output.txt", "Hello!");
-     * ```
-     */
-    function write(
-      destination: string | ViperFile,
-      data: string | ArrayBuffer | ArrayBufferView | ViperFile,
-    ): Promise<number>;
-
-    /**
-     * Read a file as text
-     * @param path Path to the file
-     *
-     * @example
-     * ```ts
-     * const content = await Viper.readFile("config.json");
-     * ```
-     */
-    function readFile(path: string): Promise<string>;
-
-    /**
-     * Read directory contents
-     * @param path Path to the directory
-     * @returns Array of file/directory names
-     *
-     * @example
-     * ```ts
-     * const files = await Viper.readDir("./src");
-     * ```
-     */
-    function readDir(path: string): Promise<string[]>;
-
-    /**
-     * Create a directory
-     * @param path Path to create
-     * @param options Options for creation
-     *
-     * @example
-     * ```ts
-     * await Viper.mkdir("path/to/dir", { recursive: true });
-     * ```
-     */
-    function mkdir(
-      path: string,
-      options?: { recursive?: boolean },
-    ): Promise<void>;
-
-    /**
-     * Remove a file or directory
-     * @param path Path to remove
-     * @param options Options for removal
-     *
-     * @example
-     * ```ts
-     * await Viper.remove("temp", { recursive: true });
-     * ```
-     */
-    function remove(
-      path: string,
-      options?: { recursive?: boolean },
-    ): Promise<void>;
-
-    /**
-     * Check if a path exists
-     * @param path Path to check
-     *
-     * @example
-     * ```ts
-     * if (await Viper.exists("config.json")) {
-     *   // ...
-     * }
-     * ```
-     */
-    function exists(path: string): Promise<boolean>;
-
-    /**
-     * Get file/directory stats
-     * @param path Path to stat
-     *
-     * @example
-     * ```ts
-     * const stats = await Viper.stat("file.txt");
-     * console.log(stats.size, stats.isFile);
-     * ```
-     */
-    function stat(path: string): Promise<ViperFileStats>;
-
-    // ========================================================================
-    // Environment API
-    // ========================================================================
-
-    /**
-     * Environment variable access
-     */
-    const env: {
-      /**
-       * Get an environment variable
-       * @param key Variable name
-       * @returns Variable value or undefined
-       */
-      get(key: string): string | undefined;
-
-      /**
-       * Set an environment variable
-       * @param key Variable name
-       * @param value Variable value
-       */
-      set(key: string, value: string): void;
-
-      /**
-       * Check if an environment variable exists
-       * @param key Variable name
-       */
-      has(key: string): boolean;
-
-      /**
-       * Get all environment variables as an object
-       */
-      toObject(): Record<string, string>;
-    };
-
-    // ========================================================================
-    // Process API
-    // ========================================================================
-
-    /**
-     * Current process ID
-     */
-    const pid: number;
-
-    /**
-     * Get the current working directory
-     */
-    function cwd(): string;
-
-    /**
-     * Viper runtime version
-     */
-    const version: string;
-
-    // ========================================================================
-    // Spawn/Exec API
-    // ========================================================================
-
-    /**
-     * Result from spawn() or exec()
-     */
-    interface SpawnResult {
-      /**
-       * Exit code of the process
-       */
-      exitCode: number;
-
-      /**
-       * Whether the process exited successfully (exit code 0)
-       */
-      success: boolean;
-
-      /**
-       * Standard output as Uint8Array (spawn) or string (exec)
-       */
-      stdout: Uint8Array | string;
-
-      /**
-       * Standard error as Uint8Array (spawn) or string (exec)
-       */
-      stderr: Uint8Array | string;
-
-      /**
-       * Get stdout as text (spawn only)
-       */
-      text?(): string;
-
-      /**
-       * Get trimmed stdout as string
-       */
-      toString(): string;
-    }
-
-    /**
-     * Options for spawn()
-     */
-    interface SpawnOptions {
-      /**
-       * Working directory for the command
-       */
-      cwd?: string;
-
-      /**
-       * Whether to run through shell
-       */
-      shell?: boolean;
-
-      /**
-       * Environment variables
-       */
-      env?: Record<string, string>;
-    }
-
-    /**
-     * Spawn a child process
-     * @param command Command to execute
-     * @param args Command arguments
-     * @param options Spawn options
-     * @returns Result with stdout/stderr as Uint8Array
-     *
-     * @example
-     * ```ts
-     * const result = Viper.spawn("node", ["--version"]);
-     * console.log(result.text()); // "v20.0.0"
-     * ```
-     */
-    function spawn(
-      command: string,
-      args?: string[],
-      options?: SpawnOptions,
-    ): SpawnResult;
-
-    /**
-     * Execute a shell command
-     * @param command Shell command to execute
-     * @returns Result with stdout/stderr as strings
-     *
-     * @example
-     * ```ts
-     * const result = Viper.exec("echo Hello");
-     * console.log(result.stdout); // "Hello\n"
-     * ```
-     */
-    function exec(command: string): SpawnResult;
-
-    /**
-     * Tagged template literal for shell commands (Bun-style)
-     * Values are automatically escaped
-     *
-     * @example
-     * ```ts
-     * const name = "World";
-     * const result = Viper.$`echo Hello ${name}`;
-     * console.log(result.toString()); // "Hello World"
-     * ```
-     */
-    function $(strings: TemplateStringsArray, ...values: any[]): SpawnResult;
-
-    /**
-     * Find the path to an executable
-     * @param command Command name to find
-     * @returns Full path to executable, or null if not found
-     *
-     * @example
-     * ```ts
-     * const nodePath = Viper.which("node");
-     * // "/usr/local/bin/node"
-     * ```
-     */
-    function which(command: string): string | null;
-
-    /**
-     * Sleep for a specified duration
-     * @param ms Milliseconds to sleep
-     * @returns Promise that resolves after the delay
-     *
-     * @example
-     * ```ts
-     * await Viper.sleep(1000); // Wait 1 second
-     * ```
-     */
-    function sleep(ms: number): Promise<void>;
-  }
-
-  /**
-   * ViperRouter class (also available as Viper.Router)
-   */
-  const ViperRouter: typeof Viper.Router;
-}
-
-// ============================================================================
-// Module Augmentation for JSX
-// ============================================================================
-
-declare namespace JSX {
-  interface Element {
-    type: string | symbol;
-    props: Record<string, any>;
-    $$typeof: symbol;
-  }
-
-  interface IntrinsicElements {
-    // HTML Elements
-    a: HtmlProps;
-    abbr: HtmlProps;
-    address: HtmlProps;
-    area: HtmlProps;
-    article: HtmlProps;
-    aside: HtmlProps;
-    audio: HtmlProps;
-    b: HtmlProps;
-    base: HtmlProps;
-    bdi: HtmlProps;
-    bdo: HtmlProps;
-    blockquote: HtmlProps;
-    body: HtmlProps;
-    br: HtmlProps;
-    button: HtmlProps;
-    canvas: HtmlProps;
-    caption: HtmlProps;
-    cite: HtmlProps;
-    code: HtmlProps;
-    col: HtmlProps;
-    colgroup: HtmlProps;
-    data: HtmlProps;
-    datalist: HtmlProps;
-    dd: HtmlProps;
-    del: HtmlProps;
-    details: HtmlProps;
-    dfn: HtmlProps;
-    dialog: HtmlProps;
-    div: HtmlProps;
-    dl: HtmlProps;
-    dt: HtmlProps;
-    em: HtmlProps;
-    embed: HtmlProps;
-    fieldset: HtmlProps;
-    figcaption: HtmlProps;
-    figure: HtmlProps;
-    footer: HtmlProps;
-    form: HtmlProps;
-    h1: HtmlProps;
-    h2: HtmlProps;
-    h3: HtmlProps;
-    h4: HtmlProps;
-    h5: HtmlProps;
-    h6: HtmlProps;
-    head: HtmlProps;
-    header: HtmlProps;
-    hgroup: HtmlProps;
-    hr: HtmlProps;
-    html: HtmlProps;
-    i: HtmlProps;
-    iframe: HtmlProps;
-    img: HtmlProps;
-    input: HtmlProps;
-    ins: HtmlProps;
-    kbd: HtmlProps;
-    label: HtmlProps;
-    legend: HtmlProps;
-    li: HtmlProps;
-    link: HtmlProps;
-    main: HtmlProps;
-    map: HtmlProps;
-    mark: HtmlProps;
-    meta: HtmlProps;
-    meter: HtmlProps;
-    nav: HtmlProps;
-    noscript: HtmlProps;
-    object: HtmlProps;
-    ol: HtmlProps;
-    optgroup: HtmlProps;
-    option: HtmlProps;
-    output: HtmlProps;
-    p: HtmlProps;
-    param: HtmlProps;
-    picture: HtmlProps;
-    pre: HtmlProps;
-    progress: HtmlProps;
-    q: HtmlProps;
-    rp: HtmlProps;
-    rt: HtmlProps;
-    ruby: HtmlProps;
-    s: HtmlProps;
-    samp: HtmlProps;
-    script: HtmlProps;
-    section: HtmlProps;
-    select: HtmlProps;
-    small: HtmlProps;
-    source: HtmlProps;
-    span: HtmlProps;
-    strong: HtmlProps;
-    style: HtmlProps;
-    sub: HtmlProps;
-    summary: HtmlProps;
-    sup: HtmlProps;
-    table: HtmlProps;
-    tbody: HtmlProps;
-    td: HtmlProps;
-    textarea: HtmlProps;
-    tfoot: HtmlProps;
-    th: HtmlProps;
-    thead: HtmlProps;
-    time: HtmlProps;
-    title: HtmlProps;
-    tr: HtmlProps;
-    track: HtmlProps;
-    u: HtmlProps;
-    ul: HtmlProps;
-    var: HtmlProps;
-    video: HtmlProps;
-    wbr: HtmlProps;
-  }
-
-  interface HtmlProps {
-    children?: any;
-    className?: string;
-    id?: string;
-    style?: string | Record<string, string | number>;
-    [key: string]: any;
-  }
-
-  interface ElementChildrenAttribute {
-    children: {};
-  }
+  // worker_threads compatibility
+  var __worker_threads: WorkerThreads;
+
+  // File system functions
+  function file(path: string, options?: { type?: string }): ViperFile;
+  function write(path: string, data: string | Uint8Array): Promise<void>;
+  function readFile(path: string): Promise<string>;
+  function exists(path: string): Promise<boolean>;
+  function readDir(path: string): Promise<string[]>;
+  function mkdir(
+    path: string,
+    options?: { recursive?: boolean },
+  ): Promise<void>;
+  function stat(path: string): Promise<FileStat>;
+
+  // JSX Runtime
+  function __viper_jsx(
+    type: string | ((props: any) => any),
+    props: any,
+    ...children: any[]
+  ): any;
+  function __viper_fragment(props: any, ...children: any[]): any;
+  function renderToString(element: any): string;
+
+  // Constants
+  var __VIPER_VERSION__: string;
+  var __VIPER_RUNTIME__: string;
 }
 
 export {};

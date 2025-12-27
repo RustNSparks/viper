@@ -2,23 +2,52 @@
 
 A fast TypeScript runtime written in Rust, powered by [Boa](https://github.com/boa-dev/boa) (JS engine) and [OXC](https://github.com/oxc-project/oxc) (TypeScript transpiler).
 
-> **Note:** This is an experimental project built with extensive AI assistance (Claude) to explore what's possible when combining Rust's performance with modern JavaScript tooling. It's a fun experiment to see how far we can push a custom TypeScript runtime!
+> **Note:** This is an experimental project built with extensive AI assistance (Claude) to explore what's possible when combining Rust's performance with modern JavaScript tooling.
 
 ## Features
 
-### What Works
+### Core Runtime
 
-- **TypeScript/TSX Execution** - Run `.ts` and `.tsx` files directly without compilation step
+- **TypeScript/TSX Execution** - Run `.ts` and `.tsx` files directly without a compilation step
 - **Fast Transpilation** - OXC-powered TypeScript to JavaScript conversion (50-100x faster than tsc)
 - **ES Modules** - Full ESM support with `import`/`export`
 - **CommonJS Interop** - Automatic CJS to ESM wrapping for npm packages
 - **JSX/TSX Support** - Built-in JSX runtime with `renderToString()`
-- **Web APIs** - `console`, `fetch`, `URL`, `TextEncoder/Decoder`, `setTimeout/setInterval`
-- **File System** - Bun-style `file()`, `write()` APIs
 - **Async/Await** - Full Promise support with event loop
-- **npm Packages** - Works with pure ESM packages like `date-fns`
-- **REPL** - Interactive TypeScript shell
-- **Bundler** - Basic bundling support
+
+### Web APIs
+
+- **Fetch API** - `fetch()`, `Request`, `Response`, `Headers`
+- **URL API** - `URL`, `URLSearchParams`
+- **Encoding** - `TextEncoder`, `TextDecoder`
+- **Timers** - `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `queueMicrotask`
+- **Console** - Full `console` API (`log`, `error`, `warn`, `info`, `debug`, `table`, `time`, etc.)
+- **Crypto** - `crypto.randomUUID()`, `crypto.getRandomValues()`, `crypto.subtle` (hashing)
+- **Structured Clone** - `structuredClone()` with transferable support
+- **Events** - `EventTarget`, `Event`, `AbortController`, `AbortSignal`
+
+### Networking
+
+- **HTTP Client** - Full Fetch API support
+- **HTTP Server** - `Viper.serve()` for creating HTTP servers (requires `--features server`)
+- **WebSocket Client** - Full WebSocket API with binary and text message support
+
+### Workers
+
+- **Web Workers** - Multi-threaded execution with `new Worker()`
+- **Message Passing** - `postMessage()` / `onmessage` with structured clone
+- **MessageChannel** - `MessageChannel` and `MessagePort` for bidirectional communication
+- **Transferables** - `ArrayBuffer` transfer support
+
+### File System
+
+- **Bun-style API** - `file()`, `write()`, `readFile()`, `exists()`, `mkdir()`, `readDir()`, `stat()`
+
+### Process & System
+
+- **Process API** - `process.argv`, `process.env`, `process.cwd()`, `process.exit()`, `process.platform`, `process.arch`
+- **Spawn/Exec** - `Viper.spawn()`, `Viper.exec()` for running external commands
+- **Path Module** - Node.js compatible `path` module (`join`, `resolve`, `dirname`, `basename`, etc.)
 
 ### Package Manager (Optional)
 
@@ -39,13 +68,6 @@ viper add -D typescript  # dev dependency
 viper remove lodash
 ```
 
-### What Doesn't Work (Yet)
-
-- **Node.js Built-ins** - No `fs`, `path`, `http`, `events` modules (Express won't work)
-- **Named ESM Exports** - Some complex re-exports don't resolve (use default exports as workaround)
-- **npm Scripts** - `postinstall` and lifecycle scripts not supported
-- **Full Node.js Compatibility** - This is not a Node.js replacement
-
 ## Installation
 
 ### From Source
@@ -58,8 +80,14 @@ cd viper
 # Build release binary
 cargo build --release
 
-# Optional: with package manager
+# With HTTP server support
+cargo build --release --features server
+
+# With package manager
 cargo build --release --features pm
+
+# With all features
+cargo build --release --features "server pm"
 
 # Binary is at ./target/release/viper
 ```
@@ -106,13 +134,6 @@ viper transpile input.ts --minify
 viper bundle src/index.ts -o dist --format esm
 ```
 
-### HTTP Server (requires `--features server`)
-
-```bash
-cargo build --release --features server
-viper serve --port 3000
-```
-
 ## Examples
 
 ### Hello World
@@ -121,84 +142,191 @@ viper serve --port 3000
 // hello.ts
 const message: string = "Hello from Viper!";
 console.log(message);
+console.log(`Platform: ${process.platform}, Arch: ${process.arch}`);
 ```
 
-```bash
-viper run hello.ts
-```
-
-### Async/Await
+### Async/Await & Fetch
 
 ```typescript
-// async.ts
-async function fetchData() {
-  const response = await fetch("https://api.github.com/users/octocat");
-  const data = await response.json();
-  console.log(data.login);
-}
+// fetch.ts
+const response = await fetch("https://httpbin.org/get");
+const data = await response.json();
+console.log(`Origin: ${data.origin}`);
 
-fetchData();
+// POST request
+const post = await fetch("https://httpbin.org/post", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ message: "Hello!" }),
+});
+console.log(await post.json());
 ```
 
 ### File System
 
 ```typescript
 // fs.ts
+// Read file
 const content = await file("./data.txt").text();
 console.log(content);
 
+// Write file
 await write("./output.txt", "Hello, World!");
+
+// Check existence
+if (await exists("./config.json")) {
+  const config = JSON.parse(await readFile("./config.json"));
+  console.log(config);
+}
+
+// Create directory
+await mkdir("./logs", { recursive: true });
+
+// List directory
+const files = await readDir("./src");
+console.log(files);
 ```
 
-### Using npm Packages
+### HTTP Server
 
 ```typescript
-// Works with ESM packages like date-fns
-import formatModule from "date-fns/format";
-import addDaysModule from "date-fns/addDays";
+// server.ts (run with: viper --features server server.ts)
+const server = Viper.serve({
+  port: 3000,
+  hostname: "127.0.0.1",
+  fetch(request: Request): Response {
+    const url = new URL(request.url);
+    
+    if (url.pathname === "/api/hello") {
+      return Response.json({ message: "Hello from Viper!" });
+    }
+    
+    return new Response("Not Found", { status: 404 });
+  },
+});
 
-const format = formatModule.format;
-const addDays = addDaysModule.addDays;
+console.log(`Server running at http://${server.hostname}:${server.port}`);
+```
 
-const today = new Date();
-console.log(format(today, "yyyy-MM-dd"));
-console.log(format(addDays(today, 7), "yyyy-MM-dd"));
+### Web Workers
+
+```typescript
+// main.ts
+const workerCode = `
+  self.onmessage = (event) => {
+    const result = event.data * 2;
+    self.postMessage(result);
+  };
+`;
+
+await write("./worker.ts", workerCode);
+
+const worker = new Worker("./worker.ts");
+
+worker.onmessage = (event) => {
+  console.log(`Result: ${event.data}`);
+  worker.terminate();
+};
+
+worker.postMessage(21); // Output: Result: 42
+```
+
+### WebSocket Client
+
+```typescript
+// websocket.ts
+const ws = new WebSocket("wss://ws.postman-echo.com/raw");
+
+ws.onopen = () => {
+  console.log("Connected!");
+  ws.send("Hello, WebSocket!");
+};
+
+ws.onmessage = (event) => {
+  console.log(`Received: ${event.data}`);
+  ws.close();
+};
+
+ws.onclose = () => {
+  console.log("Connection closed");
+};
+```
+
+### Crypto
+
+```typescript
+// crypto.ts
+// Generate UUID
+console.log(crypto.randomUUID());
+
+// Random bytes
+const bytes = crypto.randomBytes(16);
+console.log(Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join(""));
+
+// SHA-256 hash
+const data = new TextEncoder().encode("Hello, World!");
+const hash = await crypto.subtle.digest("SHA-256", data);
+const hashHex = Array.from(new Uint8Array(hash))
+  .map(b => b.toString(16).padStart(2, "0"))
+  .join("");
+console.log(`SHA-256: ${hashHex}`);
+```
+
+### Path Module
+
+```typescript
+// path.ts
+import path from "path";
+
+console.log(path.join("src", "lib", "index.ts"));
+console.log(path.resolve(".")); 
+console.log(path.dirname("/home/user/file.ts"));
+console.log(path.basename("/home/user/file.ts", ".ts"));
+console.log(path.extname("file.ts"));
+
+const parsed = path.parse("/home/user/file.ts");
+console.log(parsed); // { root, dir, base, name, ext }
 ```
 
 ### JSX/TSX
 
 ```tsx
 // app.tsx
-function App() {
+function App({ name }: { name: string }) {
   return (
-    <div>
-      <h1>Hello from Viper!</h1>
-      <p>TSX just works.</p>
-    </div>
+    <html>
+      <head><title>Hello</title></head>
+      <body>
+        <h1>Hello, {name}!</h1>
+      </body>
+    </html>
   );
 }
 
-console.log(renderToString(<App />));
+const html = renderToString(<App name="Viper" />);
+console.log(html);
 ```
 
-### Timers
+### Process & Spawn
 
 ```typescript
-// timers.ts
-console.log("Starting...");
+// spawn.ts
+// Run a command
+const result = await Viper.spawn("echo", ["Hello from spawn!"]);
+console.log(result.stdout);
 
-setTimeout(() => {
-  console.log("After 1 second");
-}, 1000);
+// Execute shell command
+const shell = await Viper.exec("echo $USER");
+console.log(shell.stdout);
 
-let count = 0;
-const interval = setInterval(() => {
-  count++;
-  console.log(`Tick ${count}`);
-  if (count >= 3) {
-    clearInterval(interval);
-  }
-}, 500);
+// Process info
+console.log(`PID: ${process.pid}`);
+console.log(`CWD: ${process.cwd()}`);
+console.log(`Platform: ${process.platform}`);
+
+// Memory usage
+const mem = process.memoryUsage();
+console.log(`Heap used: ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`);
 ```
 
 ## Architecture
@@ -220,15 +348,18 @@ const interval = setInterval(() => {
 │     - Async/await & Promises                            │
 ├─────────────────────────────────────────────────────────┤
 │              boa_runtime                                │
-│     - console, fetch, URL                               │
-│     - setTimeout, setInterval                           │
-│     - TextEncoder, TextDecoder                          │
+│     - Console, Fetch, URL                               │
+│     - Timers, Encoding                                  │
+│     - structuredClone                                   │
 ├─────────────────────────────────────────────────────────┤
 │            Viper Extensions                             │
 │     - File system APIs                                  │
-│     - process.env, process.argv                         │
-│     - crypto.randomUUID()                               │
-│     - WebSocket (client)                                │
+│     - HTTP server (Viper.serve)                         │
+│     - Web Workers & MessageChannel                      │
+│     - WebSocket client                                  │
+│     - Crypto API                                        │
+│     - Process & Spawn                                   │
+│     - Path module                                       │
 ├─────────────────────────────────────────────────────────┤
 │        Module Resolution (oxc_resolver)                 │
 │     - node_modules support                              │
@@ -242,28 +373,6 @@ const interval = setInterval(() => {
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Dependencies
-
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| JS Engine | [Boa](https://github.com/boa-dev/boa) | ECMAScript execution |
-| Transpiler | [OXC](https://github.com/oxc-project/oxc) | TypeScript/JSX parsing & transformation |
-| Resolver | [oxc_resolver](https://crates.io/crates/oxc_resolver) | Node.js-compatible module resolution |
-| Bundler | [Rolldown](https://github.com/rolldown/rolldown) | Rust-based Rollup-compatible bundler (planned) |
-| Package Manager | [Orogene](https://github.com/orogene/orogene) | npm-compatible package management |
-| CLI | [clap](https://crates.io/crates/clap) | Command-line argument parsing |
-| HTTP Server | [Axum](https://github.com/tokio-rs/axum) | HTTP server (optional) |
-
-## Performance
-
-Viper leverages Rust's performance for:
-
-- **Transpilation**: OXC is 50-100x faster than TypeScript's `tsc`
-- **Startup**: No JIT warm-up like V8, instant execution
-- **Package Install**: Orogene is comparable to pnpm/Bun in speed
-
-However, **runtime performance** is currently slower than Node.js/Bun because Boa is an interpreter without JIT compilation.
-
 ## Project Structure
 
 ```
@@ -272,6 +381,14 @@ viper/
 │   ├── main.rs          # CLI entry point
 │   ├── lib.rs           # Library exports
 │   ├── runtime/         # Boa runtime & APIs
+│   │   ├── mod.rs       # Runtime core
+│   │   ├── worker.rs    # Web Workers
+│   │   ├── websocket.rs # WebSocket client
+│   │   ├── crypto.rs    # Crypto API
+│   │   ├── process.rs   # Process object
+│   │   ├── spawn.rs     # Spawn/exec
+│   │   ├── path.rs      # Path module
+│   │   └── server_api.rs # HTTP server
 │   ├── transpiler/      # OXC TypeScript transpiler
 │   ├── resolver/        # Module resolution
 │   ├── bundler/         # JS bundling
@@ -283,6 +400,34 @@ viper/
 │   └── viper.d.ts       # TypeScript definitions
 └── Cargo.toml
 ```
+
+## Dependencies
+
+| Component | Library | Purpose |
+|-----------|---------|---------|
+| JS Engine | [Boa](https://github.com/boa-dev/boa) | ECMAScript execution |
+| Transpiler | [OXC](https://github.com/oxc-project/oxc) | TypeScript/JSX parsing & transformation |
+| Resolver | [oxc_resolver](https://crates.io/crates/oxc_resolver) | Node.js-compatible module resolution |
+| HTTP | [Hyper](https://github.com/hyperium/hyper) | HTTP client/server |
+| WebSocket | [tungstenite](https://github.com/snapview/tungstenite-rs) | WebSocket implementation |
+| Package Manager | [Orogene](https://github.com/orogene/orogene) | npm-compatible package management |
+| CLI | [clap](https://crates.io/crates/clap) | Command-line argument parsing |
+
+## Performance
+
+Viper leverages Rust's performance for:
+
+- **Transpilation**: OXC is 50-100x faster than TypeScript's `tsc`
+- **Startup**: No JIT warm-up, instant execution
+- **Package Install**: Orogene is comparable to pnpm/Bun in speed
+
+Note: **Runtime performance** is currently slower than Node.js/Bun because Boa is an interpreter without JIT compilation. This makes Viper best suited for CLI tools, scripts, and I/O-bound workloads rather than CPU-intensive computation.
+
+## Limitations
+
+- **No Node.js Built-in Modules** - `fs`, `http`, `events`, etc. are not implemented (use Viper's APIs instead)
+- **No npm Lifecycle Scripts** - `postinstall` scripts don't run
+- **No Full Node.js Compatibility** - This is not a drop-in Node.js replacement
 
 ## Why Viper?
 
@@ -298,7 +443,6 @@ It's **not** meant to replace Node.js, Deno, or Bun. It's an experiment and lear
 
 - [Boa](https://github.com/boa-dev/boa) - The incredible Rust JavaScript engine
 - [OXC](https://github.com/oxc-project/oxc) - Lightning-fast JavaScript toolchain
-- [Rolldown](https://github.com/rolldown/rolldown) - Rust-based Rollup-compatible bundler
 - [Orogene](https://github.com/orogene/orogene) - Fast npm-compatible package manager
 - [Claude](https://anthropic.com) - AI pair programming assistant that helped build this
 

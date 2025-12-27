@@ -1,10 +1,9 @@
-//! WebSocket API - Web-standard WebSocket client and server
+//! WebSocket API - Web-standard WebSocket client
 //!
-//! Uses the web-socket crate (fastest WebSocket implementation)
+//! Uses the web-socket crate for WebSocket client functionality.
 //!
 //! Provides:
 //! - WebSocket constructor (client)
-//! - WebSocketServer - Server implementation
 //! - WebSocket.send() - Send messages
 //! - WebSocket.close() - Close connection
 //! - Event handlers: onopen, onmessage, onerror, onclose
@@ -19,12 +18,12 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime as TokioRuntime;
-use web_socket::{CloseCode, DataType, Event, MessageType, WebSocket as WsClient};
+use web_socket::{DataType, Event, MessageType, WebSocket as WsClient};
 
 /// WebSocket ready states
 const READY_STATE_CONNECTING: u8 = 0;
 const READY_STATE_OPEN: u8 = 1;
-const READY_STATE_CLOSING: u8 = 2;
+const _READY_STATE_CLOSING: u8 = 2;
 const READY_STATE_CLOSED: u8 = 3;
 
 /// Global storage for WebSocket connections
@@ -35,8 +34,8 @@ static WS_COUNTER: Mutex<u32> = Mutex::new(0);
 struct WsConnection {
     ready_state: Arc<Mutex<u8>>,
     messages: Arc<Mutex<Vec<String>>>,
-    url: String,
-    runtime: Option<TokioRuntime>,
+    _url: String,
+    _runtime: Option<TokioRuntime>,
 }
 
 impl WsConnection {
@@ -47,8 +46,8 @@ impl WsConnection {
         let conn = WsConnection {
             ready_state: Arc::clone(&ready_state),
             messages: Arc::clone(&messages),
-            url: url.clone(),
-            runtime: Some(
+            _url: url.clone(),
+            _runtime: Some(
                 TokioRuntime::new().map_err(|e| format!("Failed to create runtime: {}", e))?,
             ),
         };
@@ -164,12 +163,6 @@ impl WsConnection {
     fn get(id: u32) -> Option<Arc<Mutex<WsConnection>>> {
         let connections = WS_CONNECTIONS.lock().ok()?;
         connections.as_ref()?.get(&id).cloned()
-    }
-
-    fn send(&self, data: &str) -> Result<(), String> {
-        // For sending, we need to spawn a task
-        // This is simplified - in production you'd keep the WebSocket handle
-        Ok(())
     }
 
     fn close(&mut self) -> Result<(), String> {
@@ -366,23 +359,19 @@ pub fn register_websocket_helpers(context: &mut Context) -> JsResult<()> {
 
     // __viper_ws_send
     let send_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let id = args
+        let _id = args
             .get(0)
             .ok_or_else(|| JsNativeError::typ().with_message("Missing WebSocket ID"))?
             .to_u32(context)?;
 
-        let data = args
+        let _data = args
             .get(1)
             .ok_or_else(|| JsNativeError::typ().with_message("Missing data"))?
             .to_string(context)?
             .to_std_string_escaped();
 
-        if let Some(conn_arc) = WsConnection::get(id) {
-            if let Ok(conn) = conn_arc.lock() {
-                conn.send(&data)
-                    .map_err(|e| JsNativeError::typ().with_message(e))?;
-            }
-        }
+        // Note: Send is not fully implemented yet - would need to keep WebSocket handle
+        // For now, messages are received but send requires the async WebSocket handle
 
         Ok(JsValue::undefined())
     });
@@ -448,392 +437,6 @@ pub fn register_websocket_helpers(context: &mut Context) -> JsResult<()> {
     });
 
     context.register_global_callable(js_string!("__viper_ws_get_state"), 1, get_state_fn)?;
-
-    Ok(())
-}
-
-// ============================================================================
-// WebSocket Server Implementation
-// ============================================================================
-
-use tokio::net::TcpListener;
-
-/// Global storage for WebSocket servers
-static WS_SERVERS: Mutex<Option<HashMap<u32, Arc<Mutex<WsServer>>>>> = Mutex::new(None);
-static WS_SERVER_COUNTER: Mutex<u32> = Mutex::new(0);
-
-/// WebSocket server wrapper
-struct WsServer {
-    port: u16,
-    clients: Arc<Mutex<Vec<u32>>>,
-    messages: Arc<Mutex<Vec<(u32, String)>>>, // (client_id, message)
-    is_running: Arc<Mutex<bool>>,
-}
-
-impl WsServer {
-    fn new(port: u16) -> Result<u32, String> {
-        let clients = Arc::new(Mutex::new(Vec::new()));
-        let messages = Arc::new(Mutex::new(Vec::new()));
-        let is_running = Arc::new(Mutex::new(true));
-
-        let server = WsServer {
-            port,
-            clients: Arc::clone(&clients),
-            messages: Arc::clone(&messages),
-            is_running: Arc::clone(&is_running),
-        };
-
-        // Get next server ID
-        let server_id = {
-            let mut counter = WS_SERVER_COUNTER.lock().unwrap();
-            *counter += 1;
-            *counter
-        };
-
-        // Store server
-        {
-            let mut servers = WS_SERVERS.lock().unwrap();
-            if servers.is_none() {
-                *servers = Some(HashMap::new());
-            }
-            if let Some(ref mut map) = *servers {
-                map.insert(server_id, Arc::new(Mutex::new(server)));
-            }
-        }
-
-        // Start server in background
-        let clients_clone = Arc::clone(&clients);
-        let messages_clone = Arc::clone(&messages);
-        let is_running_clone = Arc::clone(&is_running);
-
-        thread::spawn(move || {
-            let rt = TokioRuntime::new().unwrap();
-            rt.block_on(async {
-                if let Err(e) =
-                    Self::run_server(port, clients_clone, messages_clone, is_running_clone).await
-                {
-                    eprintln!("WebSocket server error: {}", e);
-                }
-            });
-        });
-
-        Ok(server_id)
-    }
-
-    async fn run_server(
-        port: u16,
-        clients: Arc<Mutex<Vec<u32>>>,
-        messages: Arc<Mutex<Vec<(u32, String)>>>,
-        is_running: Arc<Mutex<bool>>,
-    ) -> Result<(), String> {
-        let addr = format!("127.0.0.1:{}", port);
-        let listener = TcpListener::bind(&addr)
-            .await
-            .map_err(|e| format!("Failed to bind to {}: {}", addr, e))?;
-
-        println!("WebSocket server listening on ws://{}", addr);
-
-        let mut client_counter = 0u32;
-
-        loop {
-            // Check if server should stop
-            if let Ok(running) = is_running.lock() {
-                if !*running {
-                    break;
-                }
-            }
-
-            // Accept new connection
-            match listener.accept().await {
-                Ok((stream, addr)) => {
-                    client_counter += 1;
-                    let client_id = client_counter;
-
-                    // Add to clients list
-                    if let Ok(mut client_list) = clients.lock() {
-                        client_list.push(client_id);
-                    }
-
-                    println!(
-                        "New WebSocket client connected: {} (ID: {})",
-                        addr, client_id
-                    );
-
-                    let messages_clone = Arc::clone(&messages);
-                    let clients_clone = Arc::clone(&clients);
-
-                    // Handle client in separate task
-                    tokio::spawn(async move {
-                        let mut ws = WsClient::server(stream);
-
-                        loop {
-                            match ws.recv_event().await {
-                                Ok(event) => match event {
-                                    Event::Data { ty, data } => {
-                                        if matches!(ty, DataType::Complete(MessageType::Text)) {
-                                            if let Ok(text) = String::from_utf8(data.to_vec()) {
-                                                // Store message
-                                                if let Ok(mut msgs) = messages_clone.lock() {
-                                                    msgs.push((client_id, text));
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Event::Ping(data) => {
-                                        let _ = ws.send_pong(data).await;
-                                    }
-                                    Event::Close { .. } => {
-                                        println!("Client {} disconnected", client_id);
-                                        if let Ok(mut client_list) = clients_clone.lock() {
-                                            client_list.retain(|&id| id != client_id);
-                                        }
-                                        let _ = ws.close(()).await;
-                                        break;
-                                    }
-                                    Event::Error(e) => {
-                                        eprintln!("Client {} error: {:?}", client_id, e);
-                                        break;
-                                    }
-                                    _ => {}
-                                },
-                                Err(e) => {
-                                    eprintln!("Client {} receive error: {:?}", client_id, e);
-                                    break;
-                                }
-                            }
-                        }
-                    });
-                }
-                Err(e) => {
-                    eprintln!("Failed to accept connection: {}", e);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn get(id: u32) -> Option<Arc<Mutex<WsServer>>> {
-        let servers = WS_SERVERS.lock().ok()?;
-        servers.as_ref()?.get(&id).cloned()
-    }
-
-    fn get_messages(&self) -> Vec<(u32, String)> {
-        if let Ok(mut msgs) = self.messages.lock() {
-            let result = msgs.clone();
-            msgs.clear();
-            result
-        } else {
-            Vec::new()
-        }
-    }
-
-    fn get_clients(&self) -> Vec<u32> {
-        if let Ok(clients) = self.clients.lock() {
-            clients.clone()
-        } else {
-            Vec::new()
-        }
-    }
-
-    fn stop(&mut self) -> Result<(), String> {
-        if let Ok(mut running) = self.is_running.lock() {
-            *running = false;
-        }
-        Ok(())
-    }
-}
-
-/// Register WebSocket server API
-pub fn register_websocket_server(context: &mut Context) -> JsResult<()> {
-    let server_code = r#"
-        globalThis.WebSocketServer = class WebSocketServer {
-            #serverId = null;
-
-            onconnection = null;
-            onmessage = null;
-            onerror = null;
-
-            constructor(options) {
-                const port = options?.port || 8080;
-
-                try {
-                    this.#serverId = __viper_ws_server_create(port);
-                    this.port = port;
-
-                    // Start polling for messages
-                    this.#pollMessages();
-
-                    console.log(`WebSocket server created on port ${port}`);
-                } catch (e) {
-                    if (this.onerror) {
-                        this.onerror({ type: 'error', message: e.message });
-                    }
-                    throw e;
-                }
-            }
-
-            get clients() {
-                if (this.#serverId === null) return [];
-                return __viper_ws_server_get_clients(this.#serverId);
-            }
-
-            broadcast(data) {
-                const message = typeof data === 'string' ? data : String(data);
-                __viper_ws_server_broadcast(this.#serverId, message);
-            }
-
-            close() {
-                if (this.#serverId !== null) {
-                    __viper_ws_server_close(this.#serverId);
-                    this.#serverId = null;
-                }
-            }
-
-            #pollMessages() {
-                const poll = () => {
-                    if (this.#serverId === null) {
-                        return;
-                    }
-
-                    try {
-                        const messages = __viper_ws_server_receive(this.#serverId);
-                        if (messages && messages.length > 0) {
-                            for (const msg of messages) {
-                                if (this.onmessage) {
-                                    this.onmessage({
-                                        type: 'message',
-                                        clientId: msg.clientId,
-                                        data: msg.data
-                                    });
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        if (this.onerror) {
-                            this.onerror({ type: 'error', message: e.message });
-                        }
-                    }
-
-                    setTimeout(poll, 10);
-                };
-
-                setTimeout(poll, 100);
-            }
-        };
-    "#;
-
-    let source = Source::from_bytes(server_code.as_bytes());
-    context.eval(source)?;
-
-    // __viper_ws_server_create
-    let create_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let port = args
-            .get(0)
-            .ok_or_else(|| JsNativeError::typ().with_message("Missing port"))?
-            .to_u32(context)? as u16;
-
-        match WsServer::new(port) {
-            Ok(id) => Ok(JsValue::from(id)),
-            Err(e) => Err(JsNativeError::typ()
-                .with_message(format!("Failed to create server: {}", e))
-                .into()),
-        }
-    });
-
-    context.register_global_callable(js_string!("__viper_ws_server_create"), 1, create_fn)?;
-
-    // __viper_ws_server_receive
-    let receive_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let id = args
-            .get(0)
-            .ok_or_else(|| JsNativeError::typ().with_message("Missing server ID"))?
-            .to_u32(context)?;
-
-        if let Some(server_arc) = WsServer::get(id) {
-            if let Ok(server) = server_arc.lock() {
-                let messages = server.get_messages();
-                let arr = JsArray::new(context);
-
-                for (client_id, msg) in messages {
-                    let obj = boa_engine::object::ObjectInitializer::new(context)
-                        .property(
-                            js_string!("clientId"),
-                            JsValue::from(client_id),
-                            boa_engine::property::Attribute::all(),
-                        )
-                        .property(
-                            js_string!("data"),
-                            JsValue::from(js_string!(msg)),
-                            boa_engine::property::Attribute::all(),
-                        )
-                        .build();
-                    arr.push(obj, context)?;
-                }
-
-                return Ok(arr.into());
-            }
-        }
-
-        Ok(JsArray::new(context).into())
-    });
-
-    context.register_global_callable(js_string!("__viper_ws_server_receive"), 1, receive_fn)?;
-
-    // __viper_ws_server_get_clients
-    let get_clients_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let id = args
-            .get(0)
-            .ok_or_else(|| JsNativeError::typ().with_message("Missing server ID"))?
-            .to_u32(context)?;
-
-        if let Some(server_arc) = WsServer::get(id) {
-            if let Ok(server) = server_arc.lock() {
-                let clients = server.get_clients();
-                let arr = JsArray::new(context);
-                for client_id in clients {
-                    arr.push(JsValue::from(client_id), context)?;
-                }
-                return Ok(arr.into());
-            }
-        }
-
-        Ok(JsArray::new(context).into())
-    });
-
-    context.register_global_callable(
-        js_string!("__viper_ws_server_get_clients"),
-        1,
-        get_clients_fn,
-    )?;
-
-    // __viper_ws_server_broadcast (placeholder)
-    let broadcast_fn = NativeFunction::from_fn_ptr(|_this, _args, _context| {
-        // TODO: Implement broadcast functionality
-        Ok(JsValue::undefined())
-    });
-
-    context.register_global_callable(js_string!("__viper_ws_server_broadcast"), 2, broadcast_fn)?;
-
-    // __viper_ws_server_close
-    let close_fn = NativeFunction::from_fn_ptr(|_this, args, context| {
-        let id = args
-            .get(0)
-            .ok_or_else(|| JsNativeError::typ().with_message("Missing server ID"))?
-            .to_u32(context)?;
-
-        if let Some(server_arc) = WsServer::get(id) {
-            if let Ok(mut server) = server_arc.lock() {
-                server
-                    .stop()
-                    .map_err(|e| JsNativeError::typ().with_message(e))?;
-            }
-        }
-
-        Ok(JsValue::undefined())
-    });
-
-    context.register_global_callable(js_string!("__viper_ws_server_close"), 1, close_fn)?;
 
     Ok(())
 }

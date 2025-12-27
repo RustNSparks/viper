@@ -36,15 +36,10 @@ impl ModuleResolver {
     pub fn new(base_path: impl AsRef<Path>) -> Self {
         let base = base_path.as_ref().to_path_buf();
 
-        // Configure resolver to match Node.js/Bun behavior
+        // Configure resolver to match Node.js/Bun behavior with ESM priority
         let options = ResolveOptions {
-            // Support both "import" and "require" conditions
-            condition_names: vec![
-                "import".into(),
-                "require".into(),
-                "node".into(),
-                "default".into(),
-            ],
+            // Prioritize ESM imports - don't include "require" to avoid CJS
+            condition_names: vec!["import".into(), "node".into(), "default".into()],
 
             // Extensions to try (in order)
             // Matches Node.js and Bun behavior
@@ -59,20 +54,13 @@ impl ModuleResolver {
             ],
 
             // Main fields to check in package.json (in order)
-            main_fields: vec![
-                "module".into(),
-                "main".into(),
-            ],
+            main_fields: vec!["module".into(), "main".into()],
 
             // Enable exports field resolution (package.json "exports")
-            exports_fields: vec![
-                vec!["exports".into()],
-            ],
+            exports_fields: vec![vec!["exports".into()]],
 
             // Enable imports field resolution (package.json "imports")
-            imports_fields: vec![
-                vec!["imports".into()],
-            ],
+            imports_fields: vec![vec!["imports".into()]],
 
             // Enable automatic tsconfig.json discovery and paths
             tsconfig: Some(oxc_resolver::TsconfigDiscovery::Auto),
@@ -108,8 +96,6 @@ impl ModuleResolver {
             )),
         }
     }
-
-
 }
 
 #[cfg(test)]
