@@ -571,7 +571,7 @@ impl Runtime {
         // Register spawn/exec APIs
         spawn::register_spawn(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
-        // Register WebSocket API (client and server)
+        // Register WebSocket API (client only)
         websocket::register_websocket(&mut context)
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
         websocket::register_websocket_helpers(&mut context)

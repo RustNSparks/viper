@@ -323,13 +323,6 @@ fn register_router_class(context: &mut Context) -> JsResult<()> {
             options(path, handler) { return this._addRoute('OPTIONS', path, handler); }
             all(path, handler) { return this._addRoute('*', path, handler); }
 
-            // WebSocket route - Bun-style API
-            ws(path, handlers) {
-                this.wsRoutes = this.wsRoutes || [];
-                this.wsRoutes.push({ path, handlers });
-                return this;
-            }
-
             // Add a route
             _addRoute(method, path, handler) {
                 const pattern = this._compilePattern(path);
@@ -396,24 +389,6 @@ fn register_router_class(context: &mut Context) -> JsResult<()> {
                     const method = request.method;
                     const url = request.url;
 
-                    // Check for WebSocket upgrade
-                    if (request.isWebSocketUpgrade || this._isWebSocketUpgrade(request)) {
-                        const wsMatch = this._matchWsRoute(url);
-                        if (wsMatch) {
-                            // Store the WebSocket handlers for this path
-                            globalThis.__viper_ws_handlers = wsMatch.handlers;
-                            globalThis.__viper_ws_path = wsMatch.path;
-
-                            // Return 101 to signal upgrade
-                            return new Response(null, {
-                                status: 101,
-                                headers: { 'X-Viper-WebSocket': 'upgrade' }
-                            });
-                        }
-                        // No WebSocket route found, return 404
-                        return new Response('WebSocket route not found', { status: 404 });
-                    }
-
                     // Run middleware
                     for (const mw of this.middleware) {
                         const result = mw(request);
@@ -450,26 +425,6 @@ fn register_router_class(context: &mut Context) -> JsResult<()> {
                 }
 
                 return this;
-            }
-
-            // Check if request is WebSocket upgrade
-            _isWebSocketUpgrade(request) {
-                const upgrade = request.headers.get('upgrade');
-                return upgrade && upgrade.toLowerCase() === 'websocket';
-            }
-
-            // Find matching WebSocket route
-            _matchWsRoute(path) {
-                if (!this.wsRoutes) return null;
-                const pathWithoutQuery = path.split('?')[0];
-
-                for (const route of this.wsRoutes) {
-                    // Simple path matching (can be enhanced with patterns)
-                    if (route.path === pathWithoutQuery || route.path === '*') {
-                        return route;
-                    }
-                }
-                return null;
             }
         }
 
@@ -842,11 +797,6 @@ fn create_js_request(context: &mut Context, req: &JsRequest) -> Result<JsValue, 
             JsValue::from(js_string!(req.method.clone())),
             Default::default(),
         )
-        .property(
-            js_string!("isWebSocketUpgrade"),
-            JsValue::from(req.is_websocket_upgrade),
-            Default::default(),
-        )
         .build();
 
     if let Some(body) = &req.body {
@@ -955,13 +905,9 @@ fn extract_js_response(value: &JsValue, context: &mut Context) -> Result<JsRespo
         bytes::Bytes::new()
     };
 
-    // Check if this is a WebSocket upgrade response
-    let upgrade_websocket = status == 101;
-
     Ok(JsResponse {
         status,
         headers,
         body,
-        upgrade_websocket,
     })
 }

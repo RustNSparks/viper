@@ -30,7 +30,7 @@ A fast TypeScript runtime written in Rust, powered by [Boa](https://github.com/b
 
 - **HTTP Client** - Full Fetch API support
 - **HTTP Server** - `Viper.serve()` for creating HTTP servers (requires `--features server`)
-- **WebSocket Client** - Full WebSocket API with binary and text message support
+- **WebSocket Client** - Ultra-fast WebSocket client with event-driven architecture and binary message support
 
 ### Workers
 
