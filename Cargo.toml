@@ -35,6 +35,66 @@ tokio = { version = "1", features = ["full"] }
 # Crypto support
 uuid = { version = "1", features = ["v4"] }
 rand = "0.9"
+sha2 = "0.10"
+sha1 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", features = ["simple"] }
+hex = "0.4"
+# Additional crypto for full Node.js compatibility
+aes = "0.8"
+cbc = "0.1"
+ctr = "0.9"
+cfb-mode = "0.8"
+ofb = "0.6"
+ecb = "0.1"
+cipher = "0.4"
+rsa = "0.9"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+p256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
+p384 = { version = "0.13", features = ["ecdsa", "ecdh"] }
+ecdsa = "0.16"
+elliptic-curve = "0.13"
+hkdf = "0.12"
+scrypt = "0.11"
+signature = "2"
+digest = "0.10"
+subtle = "2"
+des = "0.8"
+blowfish = "0.9"
+
+# Base64 encoding for Buffer module
+base64 = "0.22"
+
+# Compression support for zlib module (using zlib-rs backend for maximum performance)
+flate2 = { version = "1.0", features = ["zlib-rs"], default-features = false }
+
+# IDNA/Punycode support for URL module
+idna = "1.0"
+
+# Lazy static for global state
+lazy_static = "1.4"
+
+# TTY detection - platform specific
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_System_Console",
+    "Win32_Foundation",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_WindowsProgramming",
+    "Win32_System_Registry",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
+    "Win32_Security",
+] }
 
 # WebSocket support (using tokio-tungstenite - reliable with TLS support)
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }

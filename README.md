@@ -26,10 +26,29 @@ A fast TypeScript runtime written in Rust, powered by [Boa](https://github.com/b
 - **Structured Clone** - `structuredClone()` with transferable support
 - **Events** - `EventTarget`, `Event`, `AbortController`, `AbortSignal`
 
+### Node.js Built-in Modules
+
+Viper now includes comprehensive support for Node.js built-in modules:
+
+- **assert** - Assertion testing (`assert`, `assert.strictEqual`, `assert.deepStrictEqual`, etc.)
+- **buffer** - Binary data handling (`Buffer.from()`, `Buffer.alloc()`, `Buffer.concat()`, etc.)
+- **events** - Event emitter pattern (`EventEmitter`, `on()`, `emit()`, `once()`, etc.)
+- **http** - HTTP client and server (`http.request()`, `http.get()`, `http.createServer()`)
+- **net** - TCP networking (`net.createServer()`, `net.connect()`, Socket API)
+- **os** - Operating system utilities (`os.platform()`, `os.cpus()`, `os.homedir()`, etc.)
+- **path** - File path operations (`path.join()`, `path.resolve()`, `path.dirname()`, etc.)
+- **querystring** - URL query string parsing (`querystring.parse()`, `querystring.stringify()`)
+- **stream** - Stream API (`Readable`, `Writable`, `Transform`, `pipeline()`)
+- **string_decoder** - String decoding (`StringDecoder`)
+- **url** - URL parsing and formatting (`url.parse()`, `url.format()`, `URL` class)
+- **util** - Utility functions (`util.promisify()`, `util.inherits()`, `util.inspect()`, etc.)
+- **zlib** - Compression (`zlib.gzip()`, `zlib.gunzip()`, `zlib.deflate()`, etc.)
+
 ### Networking
 
-- **HTTP Client** - Full Fetch API support
-- **HTTP Server** - `Viper.serve()` for creating HTTP servers (requires `--features server`)
+- **HTTP Client** - Full Fetch API support + Node.js `http` module
+- **HTTP Server** - `Viper.serve()` and `http.createServer()` for creating HTTP servers (requires `--features server`)
+- **TCP Sockets** - `net` module for TCP client/server communication
 - **WebSocket Client** - Ultra-fast WebSocket client with event-driven architecture and binary message support
 
 ### Workers
@@ -42,12 +61,13 @@ A fast TypeScript runtime written in Rust, powered by [Boa](https://github.com/b
 ### File System
 
 - **Bun-style API** - `file()`, `write()`, `readFile()`, `exists()`, `mkdir()`, `readDir()`, `stat()`
+- **Node.js fs/promises** - Compatible with Node.js `fs.promises` API
 
 ### Process & System
 
-- **Process API** - `process.argv`, `process.env`, `process.cwd()`, `process.exit()`, `process.platform`, `process.arch`
+- **Process API** - `process.argv`, `process.env`, `process.cwd()`, `process.exit()`, `process.platform`, `process.arch`, `process.memoryUsage()`
 - **Spawn/Exec** - `Viper.spawn()`, `Viper.exec()` for running external commands
-- **Path Module** - Node.js compatible `path` module (`join`, `resolve`, `dirname`, `basename`, etc.)
+- **OS Module** - System information (`os.platform()`, `os.arch()`, `os.cpus()`, `os.totalmem()`, `os.freemem()`, etc.)
 
 ### Package Manager (Optional)
 
@@ -289,7 +309,7 @@ const hashHex = Array.from(new Uint8Array(hash))
 console.log(`SHA-256: ${hashHex}`);
 ```
 
-### Path Module
+### Node.js Modules
 
 ```typescript
 // path.ts
@@ -303,6 +323,85 @@ console.log(path.extname("file.ts"));
 
 const parsed = path.parse("/home/user/file.ts");
 console.log(parsed); // { root, dir, base, name, ext }
+```
+
+```typescript
+// buffer.ts
+import { Buffer } from "buffer";
+
+const buf = Buffer.from("Hello, World!");
+console.log(buf.toString("hex"));
+console.log(buf.toString("base64"));
+
+const buf2 = Buffer.alloc(10);
+buf2.write("Hello");
+console.log(buf2.toString());
+```
+
+```typescript
+// http-server.ts
+import http from "http";
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ message: "Hello from Node.js http!" }));
+});
+
+server.listen(3000, () => {
+  console.log("Server running on http://localhost:3000");
+});
+```
+
+```typescript
+// events.ts
+import { EventEmitter } from "events";
+
+const emitter = new EventEmitter();
+
+emitter.on("data", (msg) => {
+  console.log("Received:", msg);
+});
+
+emitter.emit("data", "Hello, Events!");
+```
+
+```typescript
+// streams.ts
+import { Readable, Writable, Transform } from "stream";
+
+const readable = Readable.from(["Hello", " ", "World"]);
+const writable = new Writable({
+  write(chunk, encoding, callback) {
+    console.log(chunk.toString());
+    callback();
+  },
+});
+
+readable.pipe(writable);
+```
+
+```typescript
+// zlib.ts
+import zlib from "zlib";
+import { Buffer } from "buffer";
+
+const input = Buffer.from("Hello, compression!");
+const compressed = await zlib.gzip(input);
+console.log("Compressed size:", compressed.length);
+
+const decompressed = await zlib.gunzip(compressed);
+console.log("Decompressed:", decompressed.toString());
+```
+
+```typescript
+// assert.ts
+import assert from "assert";
+
+assert.strictEqual(1 + 1, 2);
+assert.deepStrictEqual({ a: 1 }, { a: 1 });
+assert.throws(() => { throw new Error("test"); });
+
+console.log("All assertions passed!");
 ```
 
 ### JSX/TSX
@@ -376,7 +475,10 @@ console.log(`Heap used: ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`);
 │     - WebSocket client                                  │
 │     - Crypto API                                        │
 │     - Process & Spawn                                   │
-│     - Path module                                       │
+│     - Node.js built-in modules                          │
+│       (assert, buffer, events, http, net, os, path,     │
+│        querystring, stream, string_decoder, url,        │
+│        util, zlib)                                      │
 ├─────────────────────────────────────────────────────────┤
 │        Module Resolution (oxc_resolver)                 │
 │     - node_modules support                              │
@@ -404,8 +506,20 @@ viper/
 │   │   ├── crypto.rs    # Crypto API
 │   │   ├── process.rs   # Process object
 │   │   ├── spawn.rs     # Spawn/exec
+│   │   ├── server_api.rs # HTTP server
+│   │   ├── assert.rs    # Assert module
+│   │   ├── buffer.rs    # Buffer module
+│   │   ├── events.rs    # EventEmitter
+│   │   ├── http.rs      # HTTP module
+│   │   ├── net.rs       # TCP networking
+│   │   ├── os.rs        # OS utilities
 │   │   ├── path.rs      # Path module
-│   │   └── server_api.rs # HTTP server
+│   │   ├── querystring.rs # Query string parsing
+│   │   ├── stream.rs    # Stream API
+│   │   ├── string_decoder.rs # String decoder
+│   │   ├── url.rs       # URL parsing
+│   │   ├── util.rs      # Utilities
+│   │   └── zlib.rs      # Compression
 │   ├── transpiler/      # OXC TypeScript transpiler
 │   ├── resolver/        # Module resolution
 │   ├── bundler/         # JS bundling
@@ -442,7 +556,7 @@ Note: **Runtime performance** is currently slower than Node.js/Bun because Boa i
 
 ## Limitations
 
-- **No Node.js Built-in Modules** - `fs`, `http`, `events`, etc. are not implemented (use Viper's APIs instead)
+- **Partial Node.js Compatibility** - Many Node.js built-in modules are now supported (assert, buffer, events, http, net, os, path, querystring, stream, string_decoder, url, util, zlib), but some advanced features may differ from Node.js behavior
 - **No npm Lifecycle Scripts** - `postinstall` scripts don't run
 - **No Full Node.js Compatibility** - This is not a drop-in Node.js replacement
 - **Basic Bundler** - Built-in bundler is simple concatenation. For advanced bundling (tree-shaking, code-splitting), use external tools like esbuild or Rollup

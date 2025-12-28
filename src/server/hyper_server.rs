@@ -131,33 +131,42 @@ pub fn run_server(
         .build()?;
 
     rt.block_on(async move {
-        let addr: SocketAddr = format!("{}:{}", config.hostname, config.port).parse()?;
-        let listener = TcpListener::bind(addr).await?;
+        let local_set = tokio::task::LocalSet::new();
 
-        println!("🚀 Viper server listening on http://{}", addr);
+        local_set
+            .run_until(async move {
+                let addr: SocketAddr = format!("{}:{}", config.hostname, config.port).parse()?;
+                let listener = TcpListener::bind(addr).await?;
 
-        loop {
-            let (stream, _remote_addr) = listener.accept().await?;
-            let io = TokioIo::new(stream);
-            let handler = handler.clone();
-            let max_body_size = config.max_body_size;
+                println!("🚀 Viper server listening on http://{}", addr);
 
-            // Process connection
-            let service = service_fn(move |req: Request<Incoming>| {
-                let handler = handler.clone();
-                async move { handle_request(req, handler, max_body_size).await }
-            });
+                loop {
+                    let (stream, _remote_addr) = listener.accept().await?;
+                    let io = TokioIo::new(stream);
+                    let handler = handler.clone();
+                    let max_body_size = config.max_body_size;
 
-            // Serve the connection
-            let conn = http1::Builder::new().serve_connection(io, service);
+                    // Spawn each connection as a local task so we can handle multiple connections
+                    tokio::task::spawn_local(async move {
+                        // Process connection
+                        let service = service_fn(move |req: Request<Incoming>| {
+                            let handler = handler.clone();
+                            async move { handle_request(req, handler, max_body_size).await }
+                        });
 
-            if let Err(err) = conn.await {
-                eprintln!("Error serving connection: {:?}", err);
-            }
-        }
+                        // Serve the connection
+                        let conn = http1::Builder::new().serve_connection(io, service);
 
-        #[allow(unreachable_code)]
-        Ok::<(), Box<dyn std::error::Error>>(())
+                        if let Err(err) = conn.await {
+                            eprintln!("Error serving connection: {:?}", err);
+                        }
+                    });
+                }
+
+                #[allow(unreachable_code)]
+                Ok::<(), Box<dyn std::error::Error>>(())
+            })
+            .await
     })
 }
 

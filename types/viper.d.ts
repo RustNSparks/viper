@@ -695,6 +695,363 @@ interface Console {
 }
 
 // ============================================================================
+// HTTP Module Types (Node.js compatible)
+// ============================================================================
+
+declare namespace NodeJS {
+  interface Dict<T> {
+    [key: string]: T | undefined;
+  }
+
+  interface ReadableStream extends EventTarget {
+    readable: boolean;
+    read(size?: number): any;
+    setEncoding(encoding: string): this;
+    pause(): this;
+    resume(): this;
+    pipe<T extends WritableStream>(
+      destination: T,
+      options?: { end?: boolean },
+    ): T;
+    unpipe(destination?: WritableStream): this;
+    unshift(chunk: any): void;
+    wrap(oldStream: ReadableStream): this;
+  }
+
+  interface WritableStream extends EventTarget {
+    writable: boolean;
+    write(
+      buffer: Uint8Array | string,
+      cb?: (err?: Error | null) => void,
+    ): boolean;
+    write(
+      str: string,
+      encoding?: string,
+      cb?: (err?: Error | null) => void,
+    ): boolean;
+    end(cb?: () => void): void;
+    end(buffer: Uint8Array | string, cb?: () => void): void;
+    end(str: string, encoding?: string, cb?: () => void): void;
+  }
+}
+
+interface IncomingHttpHeaders extends NodeJS.Dict<string | string[]> {
+  accept?: string;
+  "accept-language"?: string;
+  "accept-patch"?: string;
+  "accept-ranges"?: string;
+  "access-control-allow-credentials"?: string;
+  "access-control-allow-headers"?: string;
+  "access-control-allow-methods"?: string;
+  "access-control-allow-origin"?: string;
+  "access-control-expose-headers"?: string;
+  "access-control-max-age"?: string;
+  age?: string;
+  allow?: string;
+  authorization?: string;
+  "cache-control"?: string;
+  connection?: string;
+  "content-disposition"?: string;
+  "content-encoding"?: string;
+  "content-language"?: string;
+  "content-length"?: string;
+  "content-location"?: string;
+  "content-range"?: string;
+  "content-type"?: string;
+  cookie?: string;
+  date?: string;
+  etag?: string;
+  expect?: string;
+  expires?: string;
+  forwarded?: string;
+  from?: string;
+  host?: string;
+  "if-match"?: string;
+  "if-modified-since"?: string;
+  "if-none-match"?: string;
+  "if-unmodified-since"?: string;
+  "last-modified"?: string;
+  location?: string;
+  pragma?: string;
+  "proxy-authenticate"?: string;
+  "proxy-authorization"?: string;
+  range?: string;
+  referer?: string;
+  "retry-after"?: string;
+  "set-cookie"?: string[];
+  trailer?: string;
+  "transfer-encoding"?: string;
+  upgrade?: string;
+  "user-agent"?: string;
+  vary?: string;
+  via?: string;
+  warning?: string;
+  "www-authenticate"?: string;
+}
+
+interface OutgoingHttpHeaders extends NodeJS.Dict<number | string | string[]> {}
+
+interface IncomingMessage extends NodeJS.ReadableStream {
+  httpVersion: string;
+  httpVersionMajor: number;
+  httpVersionMinor: number;
+  complete: boolean;
+  connection: any;
+  socket: any;
+  headers: IncomingHttpHeaders;
+  rawHeaders: string[];
+  trailers: NodeJS.Dict<string>;
+  rawTrailers: string[];
+  setTimeout(msecs: number, callback?: () => void): this;
+  method?: string;
+  url?: string;
+  statusCode?: number;
+  statusMessage?: string;
+  destroy(error?: Error): this;
+}
+
+interface ServerResponse extends NodeJS.WritableStream {
+  statusCode: number;
+  statusMessage: string;
+  headersSent: boolean;
+  sendDate: boolean;
+  finished: boolean;
+
+  assignSocket(socket: any): void;
+  detachSocket(socket: any): void;
+  writeContinue(callback?: () => void): void;
+  writeHead(
+    statusCode: number,
+    reasonPhrase?: string,
+    headers?: OutgoingHttpHeaders,
+  ): this;
+  writeHead(statusCode: number, headers?: OutgoingHttpHeaders): this;
+  writeProcessing(): void;
+  setTimeout(msecs: number, callback?: () => void): this;
+  setHeader(name: string, value: number | string | string[]): void;
+  getHeader(name: string): number | string | string[] | undefined;
+  getHeaders(): OutgoingHttpHeaders;
+  getHeaderNames(): string[];
+  hasHeader(name: string): boolean;
+  removeHeader(name: string): void;
+  addTrailers(headers: OutgoingHttpHeaders | Array<[string, string]>): void;
+  flushHeaders(): void;
+
+  req: IncomingMessage;
+  socket: any;
+  connection: any;
+
+  cork(): void;
+  uncork(): void;
+  writableEnded: boolean;
+  writableFinished: boolean;
+
+  writeEarlyHints(
+    hints: Record<string, string | string[]>,
+    callback?: () => void,
+  ): void;
+}
+
+interface ClientRequest extends NodeJS.WritableStream {
+  connection: any;
+  socket: any;
+  aborted: boolean;
+
+  abort(): void;
+  onSocket(socket: any): void;
+  setTimeout(timeout: number, callback?: () => void): this;
+  setNoDelay(noDelay?: boolean): void;
+  setSocketKeepAlive(enable?: boolean, initialDelay?: number): void;
+
+  setHeader(name: string, value: number | string | string[]): void;
+  getHeader(name: string): number | string | string[] | undefined;
+  getHeaders(): OutgoingHttpHeaders;
+  getHeaderNames(): string[];
+  getRawHeaderNames(): string[];
+  hasHeader(name: string): boolean;
+  removeHeader(name: string): void;
+  addTrailers(headers: OutgoingHttpHeaders | Array<[string, string]>): void;
+  flushHeaders(): void;
+
+  path: string;
+  method: string;
+  host: string;
+  protocol: string;
+
+  maxHeadersCount: number;
+
+  cork(): void;
+  uncork(): void;
+  writableEnded: boolean;
+  writableFinished: boolean;
+
+  reusedSocket: boolean;
+}
+
+interface AgentOptions {
+  keepAlive?: boolean;
+  keepAliveMsecs?: number;
+  maxSockets?: number;
+  maxFreeSockets?: number;
+  maxTotalSockets?: number;
+  timeout?: number;
+  scheduling?: "fifo" | "lifo";
+}
+
+interface Agent {
+  maxSockets: number;
+  maxFreeSockets: number;
+  maxTotalSockets: number;
+  sockets: any;
+  freeSockets: any;
+  requests: any;
+
+  destroy(): void;
+  getName(options: RequestOptions): string;
+}
+
+interface AgentConstructor {
+  new (opts?: AgentOptions): Agent;
+  (opts?: AgentOptions): Agent;
+}
+
+interface RequestOptions {
+  agent?: Agent | boolean;
+  auth?: string;
+  createConnection?: (
+    options: RequestOptions,
+    oncreate: (err: Error, socket: any) => void,
+  ) => any;
+  defaultPort?: number;
+  family?: number;
+  headers?: OutgoingHttpHeaders;
+  hints?: number;
+  host?: string;
+  hostname?: string;
+  insecureHTTPParser?: boolean;
+  localAddress?: string;
+  localPort?: number;
+  lookup?: (
+    hostname: string,
+    options: object,
+    callback: (err: Error | null, address: string, family: number) => void,
+  ) => void;
+  maxHeaderSize?: number;
+  method?: string;
+  path?: string;
+  port?: number;
+  protocol?: string;
+  setHost?: boolean;
+  socketPath?: string;
+  timeout?: number;
+  signal?: AbortSignal;
+}
+
+interface Server extends EventTarget {
+  listening: boolean;
+  maxHeadersCount: number | null;
+  timeout: number;
+  keepAliveTimeout: number;
+  requestTimeout: number;
+  headersTimeout: number;
+  maxRequestsPerSocket: number;
+
+  listen(
+    port?: number,
+    hostname?: string,
+    backlog?: number,
+    listeningListener?: () => void,
+  ): this;
+  listen(
+    port?: number,
+    hostname?: string,
+    listeningListener?: () => void,
+  ): this;
+  listen(port?: number, backlog?: number, listeningListener?: () => void): this;
+  listen(port?: number, listeningListener?: () => void): this;
+  listen(path: string, backlog?: number, listeningListener?: () => void): this;
+  listen(path: string, listeningListener?: () => void): this;
+  listen(options: any, listeningListener?: () => void): this;
+  listen(handle: any, backlog?: number, listeningListener?: () => void): this;
+  listen(handle: any, listeningListener?: () => void): this;
+
+  close(callback?: (err?: Error) => void): this;
+  closeAllConnections(): void;
+  closeIdleConnections(): void;
+
+  address(): { port: number; family: string; address: string } | string | null;
+
+  setTimeout(msecs?: number, callback?: () => void): this;
+  setTimeout(callback: () => void): this;
+}
+
+interface ServerConstructor {
+  new (
+    requestListener?: (req: IncomingMessage, res: ServerResponse) => void,
+  ): Server;
+  (
+    requestListener?: (req: IncomingMessage, res: ServerResponse) => void,
+  ): Server;
+}
+
+interface HttpModule {
+  METHODS: string[];
+  STATUS_CODES: {
+    [errorCode: number]: string | undefined;
+    [errorCode: string]: string | undefined;
+  };
+
+  globalAgent: Agent;
+  maxHeaderSize: number;
+
+  createServer(
+    requestListener?: (
+      request: IncomingMessage,
+      response: ServerResponse,
+    ) => void,
+  ): Server;
+  createServer(
+    options: {
+      IncomingMessage?: typeof IncomingMessage;
+      ServerResponse?: typeof ServerResponse;
+      insecureHTTPParser?: boolean;
+      maxHeaderSize?: number;
+    },
+    requestListener?: (
+      request: IncomingMessage,
+      response: ServerResponse,
+    ) => void,
+  ): Server;
+
+  request(
+    options: RequestOptions | string | URL,
+    callback?: (res: IncomingMessage) => void,
+  ): ClientRequest;
+  request(
+    url: string | URL,
+    options: RequestOptions,
+    callback?: (res: IncomingMessage) => void,
+  ): ClientRequest;
+
+  get(
+    options: RequestOptions | string | URL,
+    callback?: (res: IncomingMessage) => void,
+  ): ClientRequest;
+  get(
+    url: string | URL,
+    options: RequestOptions,
+    callback?: (res: IncomingMessage) => void,
+  ): ClientRequest;
+
+  Agent: AgentConstructor;
+  Server: ServerConstructor;
+
+  validateHeaderName(name: string): void;
+  validateHeaderValue(name: string, value: string): void;
+  setMaxIdleHTTPParsers(max: number): void;
+}
+
+// ============================================================================
 // Path Module Types
 // ============================================================================
 
@@ -783,10 +1140,143 @@ interface Process {
 // Crypto API
 // ============================================================================
 
+// Hash algorithms
+type HashAlgorithm =
+  | "sha256"
+  | "sha-256"
+  | "sha512"
+  | "sha-512"
+  | "sha384"
+  | "sha-384"
+  | "sha224"
+  | "sha-224"
+  | "sha1"
+  | "sha-1"
+  | "md5";
+
+// Encoding types
+type BinaryToTextEncoding = "hex" | "base64" | "buffer";
+type CharacterEncoding =
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "latin1"
+  | "base64"
+  | "hex";
+
+// Hash object
+interface Hash {
+  /**
+   * Updates the hash content with the given data
+   * @param data The data to hash
+   * @param inputEncoding The encoding of the data (default: 'utf8')
+   */
+  update(data: string | Uint8Array, inputEncoding?: CharacterEncoding): Hash;
+
+  /**
+   * Calculates the digest of all of the data passed to be hashed
+   * @param encoding The encoding of the return value (default: 'hex')
+   */
+  digest(encoding?: BinaryToTextEncoding): string | Uint8Array;
+}
+
+// HMAC object
+interface Hmac {
+  /**
+   * Updates the HMAC content with the given data
+   * @param data The data to HMAC
+   * @param inputEncoding The encoding of the data (default: 'utf8')
+   */
+  update(data: string | Uint8Array, inputEncoding?: CharacterEncoding): Hmac;
+
+  /**
+   * Calculates the HMAC digest of all of the data passed
+   * @param encoding The encoding of the return value (default: 'hex')
+   */
+  digest(encoding?: BinaryToTextEncoding): string | Uint8Array;
+}
+
 interface ViperCrypto {
+  /**
+   * Generate a random RFC 4122 version 4 UUID
+   */
   randomUUID(): string;
+
+  /**
+   * Fill typed array with cryptographically strong random values
+   */
   getRandomValues<T extends ArrayBufferView>(array: T): T;
+
+  /**
+   * Generates cryptographically strong pseudorandom data
+   * @param size The number of bytes to generate
+   */
   randomBytes(size: number): Uint8Array;
+
+  /**
+   * Creates and returns a Hash object that can be used to generate hash digests
+   * @param algorithm The hash algorithm (e.g., 'sha256', 'sha512', 'md5')
+   */
+  createHash(algorithm: HashAlgorithm): Hash;
+
+  /**
+   * Creates and returns an Hmac object that uses the given algorithm and key
+   * @param algorithm The HMAC algorithm (e.g., 'sha256', 'sha512')
+   * @param key The HMAC key (string or Uint8Array)
+   */
+  createHmac(algorithm: HashAlgorithm, key: string | Uint8Array): Hmac;
+
+  /**
+   * Provides a synchronous Password-Based Key Derivation Function 2 (PBKDF2) implementation
+   * @param password The password to derive the key from
+   * @param salt The salt value
+   * @param iterations The number of iterations
+   * @param keylen The desired byte length of the derived key
+   * @param digest The digest algorithm to use (default: 'sha256')
+   */
+  pbkdf2Sync(
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
+    iterations: number,
+    keylen: number,
+    digest?: HashAlgorithm,
+  ): Uint8Array;
+
+  /**
+   * Provides an asynchronous Password-Based Key Derivation Function 2 (PBKDF2) implementation
+   * @param password The password to derive the key from
+   * @param salt The salt value
+   * @param iterations The number of iterations
+   * @param keylen The desired byte length of the derived key
+   * @param digest The digest algorithm to use (default: 'sha256')
+   * @param callback The callback function
+   */
+  pbkdf2(
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
+    iterations: number,
+    keylen: number,
+    digest: HashAlgorithm,
+    callback: (err: Error | null, derivedKey: Uint8Array) => void,
+  ): void;
+
+  /**
+   * Provides an asynchronous Password-Based Key Derivation Function 2 (PBKDF2) implementation
+   * @param password The password to derive the key from
+   * @param salt The salt value
+   * @param iterations The number of iterations
+   * @param keylen The desired byte length of the derived key
+   * @param callback The callback function
+   */
+  pbkdf2(
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
+    iterations: number,
+    keylen: number,
+    callback: (err: Error | null, derivedKey: Uint8Array) => void,
+  ): void;
+
+  // Web Crypto API (placeholder)
   subtle: {
     digest(algorithm: string, data: ArrayBuffer): Promise<ArrayBuffer>;
     encrypt(algorithm: any, key: any, data: ArrayBuffer): Promise<ArrayBuffer>;
@@ -898,6 +1388,295 @@ declare module "node:path" {
   export { default } from "path";
 }
 
+declare module "http" {
+  const http: HttpModule;
+  export = http;
+}
+
+declare module "node:http" {
+  import http = require("http");
+  export = http;
+}
+
+// ============================================================================
+// Events Module (Node.js compatible)
+// ============================================================================
+
+type EventListener = (...args: any[]) => void;
+
+interface EventEmitterOptions {
+  captureRejections?: boolean;
+}
+
+interface EventEmitter {
+  addListener(eventName: string | symbol, listener: EventListener): this;
+  on(eventName: string | symbol, listener: EventListener): this;
+  once(eventName: string | symbol, listener: EventListener): this;
+  removeListener(eventName: string | symbol, listener: EventListener): this;
+  off(eventName: string | symbol, listener: EventListener): this;
+  removeAllListeners(eventName?: string | symbol): this;
+  setMaxListeners(n: number): this;
+  getMaxListeners(): number;
+  listeners(eventName: string | symbol): EventListener[];
+  rawListeners(eventName: string | symbol): EventListener[];
+  emit(eventName: string | symbol, ...args: any[]): boolean;
+  listenerCount(eventName: string | symbol, listener?: EventListener): number;
+  prependListener(eventName: string | symbol, listener: EventListener): this;
+  prependOnceListener(
+    eventName: string | symbol,
+    listener: EventListener,
+  ): this;
+  eventNames(): (string | symbol)[];
+}
+
+interface EventEmitterConstructor {
+  new (options?: EventEmitterOptions): EventEmitter;
+  prototype: EventEmitter;
+  defaultMaxListeners: number;
+  listenerCount(emitter: EventEmitter, eventName: string | symbol): number;
+}
+
+interface OnceOptions {
+  signal?: AbortSignal;
+}
+
+interface OnOptions {
+  signal?: AbortSignal;
+  close?: string[];
+  highWaterMark?: number;
+  lowWaterMark?: number;
+}
+
+interface EventsModule {
+  EventEmitter: EventEmitterConstructor;
+  once(
+    emitter: EventEmitter,
+    eventName: string | symbol,
+    options?: OnceOptions,
+  ): Promise<any[]>;
+  on(
+    emitter: EventEmitter,
+    eventName: string | symbol,
+    options?: OnOptions,
+  ): AsyncIterableIterator<any[]>;
+  getEventListeners(
+    emitterOrTarget: EventEmitter | EventTarget,
+    eventName: string | symbol,
+  ): EventListener[];
+  getMaxListeners(emitterOrTarget: EventEmitter | EventTarget): number;
+  setMaxListeners(
+    n: number,
+    ...eventTargets: (EventEmitter | EventTarget)[]
+  ): void;
+  listenerCount(emitter: EventEmitter, eventName: string | symbol): number;
+  addAbortListener(
+    signal: AbortSignal,
+    listener: EventListener,
+  ): { [Symbol.dispose](): void };
+  errorMonitor: symbol;
+  captureRejectionSymbol: symbol;
+  captureRejections: boolean;
+  defaultMaxListeners: number;
+}
+
+declare module "events" {
+  const EventEmitter: EventEmitterConstructor;
+  export = EventEmitter;
+  export { EventEmitter };
+  export const once: EventsModule["once"];
+  export const on: EventsModule["on"];
+  export const getEventListeners: EventsModule["getEventListeners"];
+  export const getMaxListeners: EventsModule["getMaxListeners"];
+  export const setMaxListeners: EventsModule["setMaxListeners"];
+  export const listenerCount: EventsModule["listenerCount"];
+  export const addAbortListener: EventsModule["addAbortListener"];
+  export const errorMonitor: symbol;
+  export const captureRejectionSymbol: symbol;
+  export const captureRejections: boolean;
+  export const defaultMaxListeners: number;
+}
+
+declare module "node:events" {
+  export * from "events";
+  export { default } from "events";
+}
+
+// ============================================================================
+// Util Module (Node.js compatible)
+// ============================================================================
+
+interface InspectOptions {
+  showHidden?: boolean;
+  depth?: number | null;
+  colors?: boolean;
+  customInspect?: boolean;
+  showProxy?: boolean;
+  maxArrayLength?: number | null;
+  maxStringLength?: number | null;
+  breakLength?: number;
+  compact?: boolean | number;
+  sorted?: boolean | ((a: string, b: string) => number);
+  getters?: boolean | "get" | "set";
+  numericSeparator?: boolean;
+}
+
+interface UtilTypes {
+  isAnyArrayBuffer(value: any): boolean;
+  isArrayBufferView(value: any): boolean;
+  isArgumentsObject(value: any): boolean;
+  isArrayBuffer(value: any): boolean;
+  isAsyncFunction(value: any): boolean;
+  isBigInt64Array(value: any): boolean;
+  isBigIntObject(value: any): boolean;
+  isBigUint64Array(value: any): boolean;
+  isBooleanObject(value: any): boolean;
+  isBoxedPrimitive(value: any): boolean;
+  isCryptoKey(value: any): boolean;
+  isDataView(value: any): boolean;
+  isDate(value: any): boolean;
+  isExternal(value: any): boolean;
+  isFloat32Array(value: any): boolean;
+  isFloat64Array(value: any): boolean;
+  isGeneratorFunction(value: any): boolean;
+  isGeneratorObject(value: any): boolean;
+  isInt8Array(value: any): boolean;
+  isInt16Array(value: any): boolean;
+  isInt32Array(value: any): boolean;
+  isKeyObject(value: any): boolean;
+  isMap(value: any): boolean;
+  isMapIterator(value: any): boolean;
+  isModuleNamespaceObject(value: any): boolean;
+  isNativeError(value: any): boolean;
+  isNumberObject(value: any): boolean;
+  isPromise(value: any): boolean;
+  isProxy(value: any): boolean;
+  isRegExp(value: any): boolean;
+  isSet(value: any): boolean;
+  isSetIterator(value: any): boolean;
+  isSharedArrayBuffer(value: any): boolean;
+  isStringObject(value: any): boolean;
+  isSymbolObject(value: any): boolean;
+  isTypedArray(value: any): boolean;
+  isUint8Array(value: any): boolean;
+  isUint8ClampedArray(value: any): boolean;
+  isUint16Array(value: any): boolean;
+  isUint32Array(value: any): boolean;
+  isWeakMap(value: any): boolean;
+  isWeakSet(value: any): boolean;
+}
+
+interface UtilModule {
+  /**
+   * Takes an async function (or a function that returns a Promise) and returns a
+   * function following the error-first callback style.
+   */
+  callbackify<T extends (...args: any[]) => Promise<any>>(
+    fn: T,
+  ): (
+    ...args: [...Parameters<T>, (err: Error | null, result?: any) => void]
+  ) => void;
+
+  /**
+   * Takes a function following the error-first callback style and returns a version
+   * that returns promises.
+   */
+  promisify<T extends (...args: any[]) => void>(
+    fn: T,
+  ): (...args: any[]) => Promise<any>;
+
+  /**
+   * Returns a formatted string using the first argument as a printf-like format string.
+   */
+  format(format: string, ...param: any[]): string;
+
+  /**
+   * Identical to util.format(), except that it takes an inspectOptions argument.
+   */
+  formatWithOptions(
+    inspectOptions: InspectOptions,
+    format: string,
+    ...param: any[]
+  ): string;
+
+  /**
+   * Returns a string representation of object that is intended for debugging.
+   */
+  inspect(object: any, options?: InspectOptions): string;
+  inspect(
+    object: any,
+    showHidden?: boolean,
+    depth?: number | null,
+    colors?: boolean,
+  ): string;
+
+  /**
+   * Marks a function as deprecated.
+   */
+  deprecate<T extends (...args: any[]) => any>(
+    fn: T,
+    msg: string,
+    code?: string,
+  ): T;
+
+  /**
+   * Returns true if there is deep strict equality between val1 and val2.
+   */
+  isDeepStrictEqual(val1: any, val2: any): boolean;
+
+  /**
+   * Inherit the prototype methods from one constructor into another (legacy).
+   */
+  inherits(
+    constructor: new (...args: any[]) => any,
+    superConstructor: new (...args: any[]) => any,
+  ): void;
+
+  /**
+   * Creates a function that conditionally writes debug messages to stderr.
+   */
+  debuglog(
+    section: string,
+    callback?: (fn: (...args: any[]) => void) => void,
+  ): ((...args: any[]) => void) & { enabled: boolean };
+
+  /**
+   * Returns the string name for a numeric error code.
+   */
+  getSystemErrorName(err: number): string;
+
+  /**
+   * Returns a Map of all system error codes.
+   */
+  getSystemErrorMap(): Map<number, string>;
+
+  /**
+   * Type checking utilities.
+   */
+  types: UtilTypes;
+}
+
+declare module "util" {
+  const util: UtilModule;
+  export = util;
+  export const promisify: UtilModule["promisify"];
+  export const callbackify: UtilModule["callbackify"];
+  export const format: UtilModule["format"];
+  export const formatWithOptions: UtilModule["formatWithOptions"];
+  export const inspect: UtilModule["inspect"];
+  export const deprecate: UtilModule["deprecate"];
+  export const isDeepStrictEqual: UtilModule["isDeepStrictEqual"];
+  export const inherits: UtilModule["inherits"];
+  export const debuglog: UtilModule["debuglog"];
+  export const getSystemErrorName: UtilModule["getSystemErrorName"];
+  export const getSystemErrorMap: UtilModule["getSystemErrorMap"];
+  export const types: UtilTypes;
+}
+
+declare module "node:util" {
+  export * from "util";
+  export { default } from "util";
+}
+
 // ============================================================================
 // Global Declarations
 // ============================================================================
@@ -967,6 +1746,9 @@ declare global {
 
   // Path module (global)
   var path: PlatformPath;
+
+  // HTTP module (global)
+  var http: HttpModule;
 
   // Process object
   var process: Process;

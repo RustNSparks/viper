@@ -28,6 +28,7 @@ pub type ResolverResult<T> = Result<T, ResolverError>;
 /// Node.js/Bun-compatible module resolver
 pub struct ModuleResolver {
     resolver: Resolver,
+    cjs_resolver: Resolver,
     base_path: PathBuf,
 }
 
@@ -37,7 +38,7 @@ impl ModuleResolver {
         let base = base_path.as_ref().to_path_buf();
 
         // Configure resolver to match Node.js/Bun behavior with ESM priority
-        let options = ResolveOptions {
+        let esm_options = ResolveOptions {
             // Prioritize ESM imports - don't include "require" to avoid CJS
             condition_names: vec!["import".into(), "node".into(), "default".into()],
 
@@ -68,15 +69,37 @@ impl ModuleResolver {
             ..ResolveOptions::default()
         };
 
-        let resolver = Resolver::new(options);
+        // Configure resolver for CommonJS bundling - prioritize "require" condition
+        let cjs_options = ResolveOptions {
+            // Prioritize CommonJS require
+            condition_names: vec!["require".into(), "node".into(), "default".into()],
+
+            // Extensions to try - prefer .js and .cjs for CommonJS
+            extensions: vec![".js".into(), ".cjs".into(), ".json".into(), ".mjs".into()],
+
+            // Main fields - prefer main over module for CommonJS
+            main_fields: vec!["main".into()],
+
+            // Enable exports field resolution
+            exports_fields: vec![vec!["exports".into()]],
+
+            // Enable imports field resolution
+            imports_fields: vec![vec!["imports".into()]],
+
+            ..ResolveOptions::default()
+        };
+
+        let resolver = Resolver::new(esm_options);
+        let cjs_resolver = Resolver::new(cjs_options);
 
         Self {
             resolver,
+            cjs_resolver,
             base_path: base,
         }
     }
 
-    /// Resolve a module specifier to an absolute path
+    /// Resolve a module specifier to an absolute path (ESM mode)
     ///
     /// # Arguments
     /// * `specifier` - The module specifier (e.g., "./utils", "react", "@types/node")
@@ -89,6 +112,28 @@ impl ModuleResolver {
         let context = referrer.parent().unwrap_or(&self.base_path);
 
         match self.resolver.resolve(context, specifier) {
+            Ok(resolution) => Ok(resolution.path().to_path_buf()),
+            Err(error) => Err(ResolverError::ResolutionFailed(
+                specifier.to_string(),
+                error.to_string(),
+            )),
+        }
+    }
+
+    /// Resolve a module specifier to an absolute path (CommonJS mode)
+    /// This uses the "require" condition for package.json exports
+    ///
+    /// # Arguments
+    /// * `specifier` - The module specifier (e.g., "./utils", "lodash")
+    /// * `referrer` - The path of the file doing the require (used for relative resolution)
+    ///
+    /// # Returns
+    /// The absolute path to the resolved module file
+    pub fn resolve_cjs(&self, specifier: &str, referrer: &Path) -> ResolverResult<PathBuf> {
+        // Get the directory of the referrer for relative resolution
+        let context = referrer.parent().unwrap_or(&self.base_path);
+
+        match self.cjs_resolver.resolve(context, specifier) {
             Ok(resolution) => Ok(resolution.path().to_path_buf()),
             Err(error) => Err(ResolverError::ResolutionFailed(
                 specifier.to_string(),

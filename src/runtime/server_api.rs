@@ -761,6 +761,9 @@ fn serve_function(_this: &JsValue, args: &[JsValue], context: &mut Context) -> J
 /// Call the JavaScript fetch handler
 #[cfg(feature = "server")]
 fn call_js_handler(context: &mut Context, req: &JsRequest) -> Result<JsResponse, String> {
+    use boa_engine::builtins::promise::PromiseState;
+    use boa_engine::object::builtins::JsPromise;
+
     let fetch_fn = context
         .global_object()
         .get(js_string!("__viper_fetch_handler"), context)
@@ -776,6 +779,49 @@ fn call_js_handler(context: &mut Context, req: &JsRequest) -> Result<JsResponse,
         .call(&JsValue::undefined(), &[request_obj], context)
         .map_err(|e| e.to_string())?;
 
+    // Check if result is a Promise by trying to convert it
+    if let Some(promise_obj) = result.as_object() {
+        // Try to convert to JsPromise - if successful, it's a promise
+        if let Ok(promise) = JsPromise::from_object(promise_obj.clone()) {
+            // Check if promise is already fulfilled (fast path - most common case)
+            if let PromiseState::Fulfilled(ref value) = promise.state() {
+                return extract_js_response(value, context);
+            }
+
+            // Promise is pending - run the event loop until it settles
+            // This follows the same pattern as deno_core's approach:
+            // run jobs until the promise resolves or we exhaust pending jobs
+            let max_iterations = 10;
+            for _ in 0..max_iterations {
+                // Run pending microtasks/jobs
+                if context.run_jobs().is_err() {
+                    break; // No more jobs to run
+                }
+
+                // Check state after running jobs
+                match promise.state() {
+                    PromiseState::Fulfilled(ref value) => {
+                        return extract_js_response(value, context);
+                    }
+                    PromiseState::Rejected(ref err) => {
+                        let err_str = err
+                            .to_string(context)
+                            .map(|s| s.to_std_string_escaped())
+                            .unwrap_or_else(|_| "Unknown error".to_string());
+                        return Err(format!("Promise rejected: {}", err_str));
+                    }
+                    PromiseState::Pending => {
+                        // Continue loop
+                    }
+                }
+            }
+
+            // Promise still pending after exhausting jobs
+            return Err("Promise did not settle - handler must call res.end()".to_string());
+        }
+    }
+
+    // Not a promise, extract directly
     extract_js_response(&result, context)
 }
 

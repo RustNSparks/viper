@@ -62,14 +62,27 @@ fn reset_pending_timers() {
     PENDING_TIMER_COUNT.store(0, Ordering::SeqCst);
 }
 
+mod assert;
+mod buffer;
 mod crypto;
 mod event_loop;
+mod events;
+mod http;
+mod net;
+mod os;
 mod path;
 mod process;
+mod querystring;
 mod server_api;
 mod spawn;
+mod stream;
+mod string_decoder;
+mod tty;
+mod url;
+mod util;
 mod websocket;
 pub mod worker;
+mod zlib;
 
 use crate::fs;
 use crate::resolver::ModuleResolver;
@@ -155,6 +168,268 @@ impl TypeScriptModuleLoader {
                 "#
                 .to_string(),
             ),
+            "http" | "node:http" => Some(
+                r#"
+                const h = globalThis.http;
+                export default h;
+                export const {
+                    Server, Agent, ClientRequest, IncomingMessage, ServerResponse,
+                    OutgoingMessage, METHODS, STATUS_CODES, createServer, request,
+                    get, globalAgent, maxHeaderSize
+                } = h;
+                "#
+                .to_string(),
+            ),
+            "events" | "node:events" => Some(
+                r#"
+                const e = globalThis.events;
+                export default e.EventEmitter;
+                export const EventEmitter = e.EventEmitter;
+                export const once = e.once;
+                export const on = e.on;
+                export const getEventListeners = e.getEventListeners;
+                export const getMaxListeners = e.getMaxListeners;
+                export const setMaxListeners = e.setMaxListeners;
+                export const listenerCount = e.listenerCount;
+                export const addAbortListener = e.addAbortListener;
+                export const errorMonitor = e.errorMonitor;
+                export const captureRejectionSymbol = e.captureRejectionSymbol;
+                export const captureRejections = e.captureRejections;
+                export const defaultMaxListeners = e.defaultMaxListeners;
+                "#
+                .to_string(),
+            ),
+            "buffer" | "node:buffer" => Some(
+                r#"
+                const b = globalThis.buffer;
+                export default b;
+                export const Buffer = globalThis.Buffer;
+                export const constants = b.constants;
+                export const kMaxLength = b.kMaxLength;
+                export const INSPECT_MAX_BYTES = b.INSPECT_MAX_BYTES;
+                export const SlowBuffer = globalThis.Buffer;
+                export const Blob = globalThis.Blob;
+                export const File = globalThis.File;
+                export const atob = globalThis.atob;
+                export const btoa = globalThis.btoa;
+                export const transcode = function(source, fromEnc, toEnc) {
+                    return Buffer.from(source.toString(fromEnc), toEnc);
+                };
+                export const isUtf8 = function(input) {
+                    try {
+                        const str = input.toString('utf8');
+                        return Buffer.from(str, 'utf8').equals(input);
+                    } catch { return false; }
+                };
+                export const isAscii = function(input) {
+                    for (let i = 0; i < input.length; i++) {
+                        if (input[i] > 127) return false;
+                    }
+                    return true;
+                };
+                "#
+                .to_string(),
+            ),
+            "stream" | "node:stream" => Some(
+                r#"
+                const s = globalThis.stream;
+                export default s;
+                export const Stream = s.Stream;
+                export const Readable = s.Readable;
+                export const Writable = s.Writable;
+                export const Duplex = s.Duplex;
+                export const Transform = s.Transform;
+                export const PassThrough = s.PassThrough;
+                export const pipeline = s.pipeline;
+                export const finished = s.finished;
+                export const addAbortSignal = s.addAbortSignal;
+                export const promises = s.promises;
+                "#
+                .to_string(),
+            ),
+            "fs" | "node:fs" => Some(
+                r#"
+                const f = globalThis.fs;
+                export default f;
+                export const readFileSync = f.readFileSync;
+                export const writeFileSync = f.writeFileSync;
+                export const appendFileSync = f.appendFileSync;
+                export const existsSync = f.existsSync;
+                export const statSync = f.statSync;
+                export const lstatSync = f.lstatSync;
+                export const readdirSync = f.readdirSync;
+                export const mkdirSync = f.mkdirSync;
+                export const rmdirSync = f.rmdirSync;
+                export const rmSync = f.rmSync;
+                export const unlinkSync = f.unlinkSync;
+                export const renameSync = f.renameSync;
+                export const copyFileSync = f.copyFileSync;
+                export const chmodSync = f.chmodSync;
+                export const realpathSync = f.realpathSync;
+                export const accessSync = f.accessSync;
+                export const truncateSync = f.truncateSync;
+                export const openSync = f.openSync;
+                export const closeSync = f.closeSync;
+                export const readSync = f.readSync;
+                export const writeSync = f.writeSync;
+                export const readFile = f.readFile;
+                export const writeFile = f.writeFile;
+                export const appendFile = f.appendFile;
+                export const exists = f.exists;
+                export const stat = f.stat;
+                export const lstat = f.lstat;
+                export const readdir = f.readdir;
+                export const mkdir = f.mkdir;
+                export const rmdir = f.rmdir;
+                export const rm = f.rm;
+                export const unlink = f.unlink;
+                export const rename = f.rename;
+                export const copyFile = f.copyFile;
+                export const chmod = f.chmod;
+                export const realpath = f.realpath;
+                export const access = f.access;
+                export const truncate = f.truncate;
+                export const promises = f.promises;
+                export const constants = f.constants;
+                export const Dirent = f.Dirent;
+                export const Stats = f.Stats;
+                "#
+                .to_string(),
+            ),
+            "fs/promises" | "node:fs/promises" => Some(
+                r#"
+                const p = globalThis.fs.promises;
+                export default p;
+                export const readFile = p.readFile;
+                export const writeFile = p.writeFile;
+                export const appendFile = p.appendFile;
+                export const stat = p.stat;
+                export const lstat = p.lstat;
+                export const readdir = p.readdir;
+                export const mkdir = p.mkdir;
+                export const rmdir = p.rmdir;
+                export const rm = p.rm;
+                export const unlink = p.unlink;
+                export const rename = p.rename;
+                export const copyFile = p.copyFile;
+                export const chmod = p.chmod;
+                export const realpath = p.realpath;
+                export const access = p.access;
+                export const truncate = p.truncate;
+                "#
+                .to_string(),
+            ),
+            "util" | "node:util" => Some(
+                r#"
+                const u = globalThis.util;
+                export default u;
+                export const promisify = u.promisify;
+                export const callbackify = u.callbackify;
+                export const format = u.format;
+                export const formatWithOptions = u.formatWithOptions;
+                export const inspect = u.inspect;
+                export const deprecate = u.deprecate;
+                export const isDeepStrictEqual = u.isDeepStrictEqual;
+                export const inherits = u.inherits;
+                export const debuglog = u.debuglog;
+                export const getSystemErrorName = u.getSystemErrorName;
+                export const getSystemErrorMap = u.getSystemErrorMap;
+                export const types = u.types;
+                "#
+                .to_string(),
+            ),
+            "net" | "node:net" => Some(
+                r#"
+                const n = globalThis.net;
+                export default n;
+                export const Socket = n.Socket;
+                export const Server = n.Server;
+                export const BlockList = n.BlockList;
+                export const SocketAddress = n.SocketAddress;
+                export const createServer = n.createServer;
+                export const createConnection = n.createConnection;
+                export const connect = n.connect;
+                export const isIP = n.isIP;
+                export const isIPv4 = n.isIPv4;
+                export const isIPv6 = n.isIPv6;
+                "#
+                .to_string(),
+            ),
+            "tty" | "node:tty" => Some(
+                r#"
+                const t = globalThis.tty;
+                export default t;
+                export const isatty = t.isatty;
+                export const ReadStream = t.ReadStream;
+                export const WriteStream = t.WriteStream;
+                "#
+                .to_string(),
+            ),
+            "url" | "node:url" => Some(
+                r#"
+                const u = globalThis.url;
+                export default u;
+                export const URL = globalThis.URL;
+                export const URLSearchParams = globalThis.URLSearchParams;
+                export const parse = u.parse;
+                export const format = u.format;
+                export const resolve = u.resolve;
+                export const domainToASCII = u.domainToASCII;
+                export const domainToUnicode = u.domainToUnicode;
+                export const fileURLToPath = u.fileURLToPath;
+                export const pathToFileURL = u.pathToFileURL;
+                export const urlToHttpOptions = u.urlToHttpOptions;
+                export const Url = u.Url;
+                "#
+                .to_string(),
+            ),
+            "querystring" | "node:querystring" => Some(
+                r#"
+                const qs = globalThis.querystring;
+                export default qs;
+                export const parse = qs.parse;
+                export const stringify = qs.stringify;
+                export const escape = qs.escape;
+                export const unescape = qs.unescape;
+                export const decode = qs.decode;
+                export const encode = qs.encode;
+                "#
+                .to_string(),
+            ),
+            "string_decoder" | "node:string_decoder" => Some(
+                r#"
+                const sd = globalThis.string_decoder;
+                export default sd;
+                export const StringDecoder = sd.StringDecoder;
+                "#
+                .to_string(),
+            ),
+            "assert" | "node:assert" => Some(
+                r#"
+                const a = globalThis.assert;
+                export default a;
+                export const AssertionError = a.AssertionError;
+                export const ok = a.ok;
+                export const equal = a.equal;
+                export const notEqual = a.notEqual;
+                export const strictEqual = a.strictEqual;
+                export const notStrictEqual = a.notStrictEqual;
+                export const deepEqual = a.deepEqual;
+                export const notDeepEqual = a.notDeepEqual;
+                export const deepStrictEqual = a.deepStrictEqual;
+                export const notDeepStrictEqual = a.notDeepStrictEqual;
+                export const fail = a.fail;
+                export const throws = a.throws;
+                export const doesNotThrow = a.doesNotThrow;
+                export const rejects = a.rejects;
+                export const doesNotReject = a.doesNotReject;
+                export const match = a.match;
+                export const doesNotMatch = a.doesNotMatch;
+                export const ifError = a.ifError;
+                export const strict = a.strict;
+                "#
+                .to_string(),
+            ),
             // Add more built-in modules here as they're implemented
             _ => None,
         }
@@ -230,6 +505,19 @@ function __cjs_require__(id) {
 
         // Add each module as a function
         for (id, (code, require_map)) in &modules {
+            // Handle JSON files specially - they don't need the require wrapper
+            if id.ends_with(".json") {
+                bundle.push_str(&format!(
+                    r#"__cjs_modules__["{}"] = function(exports, module, __parent_require__, __filename) {{
+module.exports = {};
+}};
+
+"#,
+                    id, code
+                ));
+                continue;
+            }
+
             // Build a local require function that maps specifiers to resolved IDs
             let mut require_mappings = String::from("const __require_map__ = {\n");
             for (spec, resolved_id) in require_map {
@@ -246,6 +534,193 @@ function __cjs_require__(id) {
 const __dirname = __filename.substring(0, __filename.lastIndexOf('/'));
 {}
 function require(specifier) {{
+    // Check built-in modules first
+    if (specifier === 'buffer' || specifier === 'node:buffer') {{
+        // Create a callable Buffer constructor wrapper
+        const _Buffer = globalThis.Buffer;
+        function Buffer(arg, encodingOrOffset, length) {{
+            if (!(this instanceof Buffer)) {{
+                return Buffer.from(arg, encodingOrOffset, length);
+            }}
+            return Buffer.from(arg, encodingOrOffset, length);
+        }}
+        Buffer.prototype = Object.create(Uint8Array.prototype);
+        Buffer.prototype.constructor = Buffer;
+        Buffer.from = _Buffer.from;
+        Buffer.alloc = _Buffer.alloc;
+        Buffer.allocUnsafe = _Buffer.allocUnsafe || _Buffer.alloc;
+        Buffer.allocUnsafeSlow = _Buffer.allocUnsafeSlow || _Buffer.alloc;
+        Buffer.concat = _Buffer.concat;
+        Buffer.byteLength = _Buffer.byteLength;
+        Buffer.compare = _Buffer.compare;
+        Buffer.isBuffer = _Buffer.isBuffer;
+        Buffer.isEncoding = _Buffer.isEncoding;
+        Buffer.poolSize = 8192;
+        return {{ Buffer: Buffer, constants: globalThis.buffer?.constants || {{}}, kMaxLength: 2147483647, SlowBuffer: Buffer }};
+    }}
+    if (specifier === 'path' || specifier === 'node:path') {{
+        return globalThis.path;
+    }}
+    if (specifier === 'events' || specifier === 'node:events') {{
+        return globalThis.events;
+    }}
+    if (specifier === 'http' || specifier === 'node:http') {{
+        return globalThis.http;
+    }}
+    if (specifier === 'fs' || specifier === 'node:fs') {{
+        return globalThis.fs;
+    }}
+    if (specifier === 'fs/promises' || specifier === 'node:fs/promises') {{
+        return globalThis.fs.promises;
+    }}
+    if (specifier === 'process' || specifier === 'node:process') {{
+        return globalThis.process;
+    }}
+    if (specifier === 'util' || specifier === 'node:util') {{
+        return globalThis.util;
+    }}
+    if (specifier === 'stream' || specifier === 'node:stream') {{
+        return globalThis.stream;
+    }}
+    if (specifier === 'crypto' || specifier === 'node:crypto') {{
+        return globalThis.crypto;
+    }}
+    if (specifier === 'tty' || specifier === 'node:tty') {{
+        return {{
+            isatty: (fd) => false,
+            ReadStream: class ReadStream {{}},
+            WriteStream: class WriteStream {{
+                constructor() {{ this.isTTY = false; this.columns = 80; this.rows = 24; }}
+                getColorDepth() {{ return 1; }}
+                hasColors() {{ return false; }}
+            }}
+        }};
+    }}
+    if (specifier === 'os' || specifier === 'node:os') {{
+        return {{
+            platform: () => globalThis.process?.platform || 'unknown',
+            arch: () => globalThis.process?.arch || 'unknown',
+            cpus: () => [],
+            totalmem: () => 0,
+            freemem: () => 0,
+            homedir: () => globalThis.process?.env?.HOME || globalThis.process?.env?.USERPROFILE || '',
+            tmpdir: () => globalThis.process?.env?.TMPDIR || globalThis.process?.env?.TEMP || '/tmp',
+            hostname: () => 'localhost',
+            type: () => 'Unknown',
+            release: () => '0.0.0',
+            EOL: globalThis.process?.platform === 'win32' ? '\\r\\n' : '\\n'
+        }};
+    }}
+    if (specifier === 'zlib' || specifier === 'node:zlib') {{
+        return {{
+            createGzip: () => new (globalThis.stream?.Transform || class{{}})(),
+            createGunzip: () => new (globalThis.stream?.Transform || class{{}})(),
+            createDeflate: () => new (globalThis.stream?.Transform || class{{}})(),
+            createInflate: () => new (globalThis.stream?.Transform || class{{}})(),
+            gzip: (buf, cb) => cb(null, buf),
+            gunzip: (buf, cb) => cb(null, buf),
+            deflate: (buf, cb) => cb(null, buf),
+            inflate: (buf, cb) => cb(null, buf)
+        }};
+    }}
+    if (specifier === 'string_decoder' || specifier === 'node:string_decoder') {{
+        return {{
+            StringDecoder: class StringDecoder {{
+                constructor(encoding = 'utf8') {{ this.encoding = encoding; }}
+                write(buffer) {{ return buffer.toString(this.encoding); }}
+                end(buffer) {{ return buffer ? buffer.toString(this.encoding) : ''; }}
+            }}
+        }};
+    }}
+    if (specifier === 'net' || specifier === 'node:net') {{
+        return globalThis.net;
+    }}
+    if (specifier === 'url' || specifier === 'node:url') {{
+        return {{
+            URL: globalThis.URL,
+            URLSearchParams: globalThis.URLSearchParams,
+            parse: (urlStr) => {{
+                try {{
+                    const u = new URL(urlStr);
+                    return {{ protocol: u.protocol, hostname: u.hostname, host: u.host, port: u.port, pathname: u.pathname, search: u.search, hash: u.hash, href: u.href, path: u.pathname + u.search }};
+                }} catch(e) {{ return null; }}
+            }},
+            format: (urlObj) => {{
+                if (typeof urlObj === 'string') return urlObj;
+                return urlObj.href || '';
+            }},
+            resolve: (from, to) => new URL(to, from).href
+        }};
+    }}
+    if (specifier === 'querystring' || specifier === 'node:querystring') {{
+        return {{
+            parse: (str) => {{
+                const result = {{}};
+                if (!str || typeof str !== 'string') return result;
+                str = str.replace(/^\\?/, '');
+                const pairs = str.split('&');
+                for (const pair of pairs) {{
+                    if (!pair) continue;
+                    const idx = pair.indexOf('=');
+                    const key = idx >= 0 ? decodeURIComponent(pair.slice(0, idx)) : decodeURIComponent(pair);
+                    const value = idx >= 0 ? decodeURIComponent(pair.slice(idx + 1)) : '';
+                    if (result[key] !== undefined) {{
+                        if (Array.isArray(result[key])) result[key].push(value);
+                        else result[key] = [result[key], value];
+                    }} else {{
+                        result[key] = value;
+                    }}
+                }}
+                return result;
+            }},
+            stringify: (obj) => {{
+                const pairs = [];
+                for (const key in obj) {{
+                    const value = obj[key];
+                    if (Array.isArray(value)) {{
+                        for (const v of value) pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(v));
+                    }} else {{
+                        pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
+                    }}
+                }}
+                return pairs.join('&');
+            }},
+            escape: (str) => encodeURIComponent(str),
+            unescape: (str) => decodeURIComponent(str)
+        }};
+    }}
+    if (specifier === 'assert' || specifier === 'node:assert') {{
+        const AssertionError = class extends Error {{ constructor(msg) {{ super(msg); this.name = 'AssertionError'; }} }};
+        const ok = (value, message) => {{ if (!value) throw new AssertionError(message || 'Assertion failed'); }};
+        ok.ok = ok;
+        ok.strictEqual = (a, b, message) => {{ if (a !== b) throw new AssertionError(message || `Expected ${{a}} === ${{b}}`); }};
+        ok.notStrictEqual = (a, b, message) => {{ if (a === b) throw new AssertionError(message || `Expected ${{a}} !== ${{b}}`); }};
+        ok.deepStrictEqual = (a, b, message) => {{ if (JSON.stringify(a) !== JSON.stringify(b)) throw new AssertionError(message || 'Deep equality failed'); }};
+        ok.throws = (fn, message) => {{ try {{ fn(); throw new AssertionError(message || 'Expected function to throw'); }} catch(e) {{}} }};
+        ok.AssertionError = AssertionError;
+        return ok;
+    }}
+    if (specifier === 'timers' || specifier === 'node:timers') {{
+        return {{
+            setTimeout: globalThis.setTimeout,
+            clearTimeout: globalThis.clearTimeout,
+            setInterval: globalThis.setInterval,
+            clearInterval: globalThis.clearInterval,
+            setImmediate: globalThis.setImmediate || ((fn) => setTimeout(fn, 0)),
+            clearImmediate: globalThis.clearImmediate || globalThis.clearTimeout
+        }};
+    }}
+    if (specifier === 'constants' || specifier === 'node:constants') {{
+        return {{}};
+    }}
+    if (specifier === 'punycode' || specifier === 'node:punycode') {{
+        return {{
+            encode: (str) => str,
+            decode: (str) => str,
+            toASCII: (str) => str,
+            toUnicode: (str) => str
+        }};
+    }}
     const resolved = __require_map__[specifier];
     if (resolved) {{
         return __parent_require__(resolved);
@@ -300,9 +775,18 @@ export {{ __entry_exports__ as module }};
             std::collections::HashMap::new();
 
         for req in requires {
-            // Resolve the require path
-            if let Ok(resolved) = self.resolver.resolve(&req, file_path) {
-                let resolved_id = resolved.to_string_lossy().replace('\\', "/");
+            // Resolve the require path using CommonJS resolver (prefers "require" condition)
+            if let Ok(resolved) = self.resolver.resolve_cjs(&req, file_path) {
+                // Skip TypeScript declaration files (.d.ts) - they're not runtime code
+                let resolved_str = resolved.to_string_lossy();
+                if resolved_str.ends_with(".d.ts")
+                    || resolved_str.ends_with(".d.mts")
+                    || resolved_str.ends_with(".d.cts")
+                {
+                    continue;
+                }
+
+                let resolved_id = resolved_str.replace('\\', "/");
                 require_map.insert(req.clone(), resolved_id);
                 self.collect_cjs_modules(&resolved, modules, visited)?;
             }
@@ -379,7 +863,7 @@ impl ModuleLoader for TypeScriptModuleLoader {
                 .unwrap_or_else(|| self.base_path.join("index.ts"));
 
             // Use oxc_resolver for Node.js/Bun-compatible module resolution
-            let resolved_path = self
+            let mut resolved_path = self
                 .resolver
                 .resolve(&specifier_str, &referrer_path)
                 .map_err(|e| {
@@ -388,6 +872,33 @@ impl ModuleLoader for TypeScriptModuleLoader {
                         specifier_str, e
                     ))))
                 })?;
+
+            // Skip TypeScript declaration files (.d.ts) - try to find the JS version
+            let resolved_str = resolved_path.to_string_lossy();
+            if resolved_str.ends_with(".d.ts")
+                || resolved_str.ends_with(".d.mts")
+                || resolved_str.ends_with(".d.cts")
+            {
+                // Try to find corresponding .js file
+                let js_path = if resolved_str.ends_with(".d.ts") {
+                    resolved_path.with_extension("js")
+                } else if resolved_str.ends_with(".d.mts") {
+                    resolved_path.with_extension("mjs")
+                } else {
+                    resolved_path.with_extension("cjs")
+                };
+
+                if js_path.exists() {
+                    resolved_path = js_path;
+                } else {
+                    // Try index.js in same directory
+                    let parent = resolved_path.parent().unwrap_or(&resolved_path);
+                    let index_js = parent.join("index.js");
+                    if index_js.exists() {
+                        resolved_path = index_js;
+                    }
+                }
+            }
 
             // Read the resolved file
             let source_code = std::fs::read_to_string(&resolved_path).map_err(|e| {
@@ -553,8 +1064,8 @@ impl Runtime {
         // Wrap setTimeout/setInterval to track pending timers
         Self::wrap_timer_functions(&mut context)?;
 
-        // Register high-performance file system API
-        fs::simple::register_file_system(&mut context)
+        // Register ultra-fast file system API (Node.js compatible)
+        fs::fast::register_fs_module(&mut context)
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;
 
         // Register Viper.serve() API
@@ -579,6 +1090,57 @@ impl Runtime {
 
         // Register path module (Node.js compatible)
         path::register_path(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register events module (Node.js compatible EventEmitter)
+        events::register_events_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register HTTP module (Node.js compatible)
+        http::register_http_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register Buffer module (Node.js compatible, high-performance native Rust)
+        buffer::register_buffer_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register util module (Node.js compatible utility functions)
+        util::register_util_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register stream module (Node.js compatible streams)
+        stream::register_stream_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register TTY module (Node.js compatible, native Rust performance)
+        tty::register_tty_module(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register net module (Node.js compatible TCP networking, native Rust performance)
+        net::register_net_module(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register os module (Node.js compatible, native Rust performance)
+        os::register_os_module(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register zlib module (Node.js compatible compression, using zlib-rs for max performance)
+        zlib::register_zlib_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register querystring module (Node.js compatible URL query string utilities)
+        querystring::register_querystring_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register url module (Node.js compatible URL utilities extending WHATWG URL API)
+        url::register_url_module(&mut context).map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register string_decoder module (Node.js compatible string decoding)
+        string_decoder::register_string_decoder_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register assert module (Node.js compatible assertions)
+        assert::register_assert_module(&mut context)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        // Register global require() function for CommonJS compatibility
+        Self::register_require_function(&mut context)?;
 
         // Register Worker API (high-performance Web Workers)
         worker::register_worker_api(&mut context)
@@ -640,6 +1202,62 @@ impl Runtime {
                 // Track active timers
                 const activeTimers = new Set();
                 const activeIntervals = new Set();
+
+                // nextTick queue (highest priority - runs before I/O)
+                const nextTickQueue = [];
+                let processingNextTick = false;
+
+                // setImmediate queue (runs after I/O, in check phase)
+                const immediateQueue = [];
+                let immediateId = 0;
+                const immediateCallbacks = new Map();
+
+                // Process nextTick queue
+                function processNextTicks() {
+                    if (processingNextTick) return;
+                    processingNextTick = true;
+                    while (nextTickQueue.length > 0) {
+                        const { callback, args } = nextTickQueue.shift();
+                        try {
+                            callback.apply(null, args);
+                        } catch (e) {
+                            console.error('nextTick error:', e);
+                        }
+                    }
+                    processingNextTick = false;
+                }
+
+                // process.nextTick - runs before any I/O
+                if (!globalThis.process) globalThis.process = {};
+                globalThis.process.nextTick = function(callback, ...args) {
+                    nextTickQueue.push({ callback, args });
+                    // Use queueMicrotask to process before next macrotask
+                    queueMicrotask(processNextTicks);
+                };
+
+                // setImmediate - runs in check phase (after I/O)
+                globalThis.setImmediate = function(callback, ...args) {
+                    const id = ++immediateId;
+                    immediateCallbacks.set(id, { callback, args });
+                    __viper_timer_increment();
+                    // Use setTimeout(0) to schedule in macrotask queue
+                    _origSetTimeout(() => {
+                        const entry = immediateCallbacks.get(id);
+                        if (entry) {
+                            immediateCallbacks.delete(id);
+                            __viper_timer_decrement();
+                            entry.callback.apply(null, entry.args);
+                        }
+                    }, 0);
+                    return id;
+                };
+
+                globalThis.clearImmediate = function(id) {
+                    if (immediateCallbacks.has(id)) {
+                        immediateCallbacks.delete(id);
+                        __viper_timer_decrement();
+                    }
+                };
 
                 // Wrap setTimeout
                 globalThis.setTimeout = function(callback, delay, ...args) {
@@ -714,6 +1332,486 @@ impl Runtime {
 
         // Execute wrapper code
         let source = Source::from_bytes(wrapper_code.as_bytes());
+        context
+            .eval(source)
+            .map_err(|e| RuntimeError::JsError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Register global require() function for CommonJS compatibility
+    fn register_require_function(context: &mut Context) -> RuntimeResult<()> {
+        let require_code = r#"
+            // V8-specific Error API polyfills (needed for depd, etc.)
+            if (typeof Error.captureStackTrace !== 'function') {
+                Error.captureStackTrace = function(targetObject, constructorOpt) {
+                    // Create a mock stack trace array that mimics V8's CallSite objects
+                    const mockCallSite = {
+                        getFileName: () => 'unknown',
+                        getLineNumber: () => 0,
+                        getColumnNumber: () => 0,
+                        getFunctionName: () => 'anonymous',
+                        getTypeName: () => null,
+                        getMethodName: () => null,
+                        getEvalOrigin: () => null,
+                        isTopLevel: () => true,
+                        isEval: () => false,
+                        isNative: () => false,
+                        isConstructor: () => false,
+                        toString: () => 'at anonymous (unknown:0:0)'
+                    };
+
+                    // Assign a stack array with mock call sites
+                    targetObject.stack = [mockCallSite, mockCallSite, mockCallSite];
+                };
+            }
+
+            if (typeof Error.stackTraceLimit === 'undefined') {
+                Error.stackTraceLimit = 10;
+            }
+
+            if (typeof Error.prepareStackTrace === 'undefined') {
+                Error.prepareStackTrace = undefined;
+            }
+
+            // Module cache
+            globalThis.__moduleCache = {};
+
+            // Create a proper Buffer constructor wrapper for Node.js compatibility
+            // safer-buffer and other modules expect Buffer to be a constructor with a prototype
+            const BufferConstructor = (function() {
+                const _Buffer = globalThis.Buffer;
+
+                // Create constructor function
+                function Buffer(arg, encodingOrOffset, length) {
+                    if (!(this instanceof Buffer)) {
+                        return Buffer.from(arg, encodingOrOffset, length);
+                    }
+                    // When called as constructor, delegate to from
+                    const buf = _Buffer.from(arg, encodingOrOffset, length);
+                    Object.setPrototypeOf(buf, Buffer.prototype);
+                    return buf;
+                }
+
+                // Create prototype
+                Buffer.prototype = Object.create(Uint8Array.prototype);
+                Buffer.prototype.constructor = Buffer;
+
+                // Copy static methods from _Buffer
+                Buffer.alloc = _Buffer.alloc;
+                Buffer.allocUnsafe = _Buffer.allocUnsafe;
+                Buffer.allocUnsafeSlow = _Buffer.allocUnsafeSlow;
+                Buffer.from = function(value, encodingOrOffset, length) {
+                    const buf = _Buffer.from(value, encodingOrOffset, length);
+                    // Don't change prototype - it adds overhead
+                    return buf;
+                };
+                Buffer.concat = _Buffer.concat;
+                Buffer.byteLength = _Buffer.byteLength;
+                Buffer.compare = _Buffer.compare;
+                Buffer.isBuffer = _Buffer.isBuffer;
+                Buffer.isEncoding = _Buffer.isEncoding;
+
+                // Node.js Buffer constants
+                Buffer.poolSize = 8192;
+                Buffer.kMaxLength = 2147483647;
+
+                return Buffer;
+            })();
+
+            // Built-in modules map
+            const builtinModules = {
+                'buffer': () => ({ Buffer: BufferConstructor, constants: globalThis.buffer?.constants, kMaxLength: globalThis.buffer?.kMaxLength, SlowBuffer: BufferConstructor }),
+                'path': () => globalThis.path,
+                'events': () => globalThis.events,
+                'http': () => globalThis.http,
+                'fs': () => globalThis.fs,
+                'fs/promises': () => globalThis.fs?.promises,
+                'process': () => globalThis.process,
+                'crypto': () => globalThis.crypto,
+                'util': () => globalThis.util,
+                'stream': () => globalThis.stream,
+                'url': () => ({
+                    URL: globalThis.URL,
+                    parse: (urlStr) => {
+                        try {
+                            const u = new URL(urlStr);
+                            return { protocol: u.protocol, hostname: u.hostname, port: u.port, pathname: u.pathname, search: u.search, hash: u.hash, href: u.href };
+                        } catch(e) { return null; }
+                    },
+                    format: (urlObj) => urlObj.href || '',
+                }),
+                'querystring': () => ({
+                    parse: (str) => {
+                        const result = {};
+                        if (!str || typeof str !== 'string') return result;
+                        str = str.replace(/^\?/, '');
+                        const pairs = str.split('&');
+                        for (const pair of pairs) {
+                            if (!pair) continue;
+                            const idx = pair.indexOf('=');
+                            const key = idx >= 0 ? decodeURIComponent(pair.slice(0, idx)) : decodeURIComponent(pair);
+                            const value = idx >= 0 ? decodeURIComponent(pair.slice(idx + 1)) : '';
+                            if (result[key] !== undefined) {
+                                if (Array.isArray(result[key])) result[key].push(value);
+                                else result[key] = [result[key], value];
+                            } else {
+                                result[key] = value;
+                            }
+                        }
+                        return result;
+                    },
+                    stringify: (obj) => {
+                        const pairs = [];
+                        for (const key in obj) {
+                            const value = obj[key];
+                            if (Array.isArray(value)) {
+                                for (const v of value) pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(v));
+                            } else {
+                                pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
+                            }
+                        }
+                        return pairs.join('&');
+                    },
+                    encode: function(obj) { return this.stringify(obj); },
+                    decode: function(str) { return this.parse(str); },
+                    escape: (str) => encodeURIComponent(str),
+                    unescape: (str) => decodeURIComponent(str),
+                }),
+                'string_decoder': () => ({
+                    StringDecoder: class StringDecoder {
+                        constructor(encoding = 'utf8') { this.encoding = encoding; }
+                        write(buffer) { return buffer.toString(this.encoding); }
+                        end(buffer) { return buffer ? buffer.toString(this.encoding) : ''; }
+                    }
+                }),
+                'assert': () => ({
+                    ok: (value, message) => { if (!value) throw new Error(message || 'Assertion failed'); },
+                    strictEqual: (a, b, message) => { if (a !== b) throw new Error(message || `Expected ${a} === ${b}`); },
+                    deepStrictEqual: (a, b, message) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(message || 'Deep equality failed'); },
+                    notStrictEqual: (a, b, message) => { if (a === b) throw new Error(message || `Expected ${a} !== ${b}`); },
+                    throws: (fn, message) => { try { fn(); throw new Error(message || 'Expected function to throw'); } catch(e) {} },
+                }),
+                'os': () => ({
+                    platform: () => globalThis.process?.platform || 'unknown',
+                    arch: () => globalThis.process?.arch || 'unknown',
+                    cpus: () => [],
+                    totalmem: () => 0,
+                    freemem: () => 0,
+                    homedir: () => globalThis.process?.env?.HOME || globalThis.process?.env?.USERPROFILE || '',
+                    tmpdir: () => globalThis.process?.env?.TMPDIR || globalThis.process?.env?.TEMP || '/tmp',
+                    hostname: () => 'localhost',
+                    type: () => 'Unknown',
+                    release: () => '0.0.0',
+                    uptime: () => 0,
+                    loadavg: () => [0, 0, 0],
+                    networkInterfaces: () => ({}),
+                    EOL: globalThis.process?.platform === 'win32' ? '\r\n' : '\n',
+                }),
+                'timers': () => ({
+                    setTimeout: globalThis.setTimeout,
+                    clearTimeout: globalThis.clearTimeout,
+                    setInterval: globalThis.setInterval,
+                    clearInterval: globalThis.clearInterval,
+                    setImmediate: globalThis.setImmediate || ((fn) => setTimeout(fn, 0)),
+                    clearImmediate: globalThis.clearImmediate || clearTimeout,
+                }),
+                'tty': () => ({
+                    isatty: (fd) => false,
+                    ReadStream: class ReadStream {},
+                    WriteStream: class WriteStream {
+                        constructor() { this.isTTY = false; this.columns = 80; this.rows = 24; }
+                        getColorDepth() { return 1; }
+                        hasColors() { return false; }
+                    },
+                }),
+                'net': () => ({
+                    Socket: class Socket extends globalThis.events?.EventEmitter {
+                        constructor() { super(); this.writable = true; this.readable = true; }
+                        connect() { return this; }
+                        write() { return true; }
+                        end() {}
+                        destroy() {}
+                        setEncoding() {}
+                        setNoDelay() {}
+                        setKeepAlive() {}
+                        setTimeout() {}
+                    },
+                    Server: class Server extends globalThis.events?.EventEmitter {
+                        constructor() { super(); }
+                        listen() { return this; }
+                        close() {}
+                        address() { return { port: 0, family: 'IPv4', address: '0.0.0.0' }; }
+                    },
+                    createServer: (options, connectionListener) => new (builtinModules['net']()).Server(),
+                    createConnection: () => new (builtinModules['net']()).Socket(),
+                    connect: () => new (builtinModules['net']()).Socket(),
+                    isIP: (input) => { try { return input.includes(':') ? 6 : (input.match(/^\d+\.\d+\.\d+\.\d+$/) ? 4 : 0); } catch(e) { return 0; } },
+                    isIPv4: (input) => builtinModules['net']().isIP(input) === 4,
+                    isIPv6: (input) => builtinModules['net']().isIP(input) === 6,
+                }),
+                'zlib': () => ({
+                    createGzip: () => new (globalThis.stream?.Transform || class{})(),
+                    createGunzip: () => new (globalThis.stream?.Transform || class{})(),
+                    createDeflate: () => new (globalThis.stream?.Transform || class{})(),
+                    createInflate: () => new (globalThis.stream?.Transform || class{})(),
+                    gzip: (buf, cb) => cb(null, buf),
+                    gunzip: (buf, cb) => cb(null, buf),
+                    deflate: (buf, cb) => cb(null, buf),
+                    inflate: (buf, cb) => cb(null, buf),
+                }),
+            };
+
+            // Add node: prefix versions
+            for (const key of Object.keys(builtinModules)) {
+                builtinModules['node:' + key] = builtinModules[key];
+            }
+
+            // Path utilities for require resolution
+            const isWindows = globalThis.process?.platform === 'win32';
+
+            function dirname(p) {
+                const normalized = p.replace(/\\/g, '/');
+                const lastSlash = normalized.lastIndexOf('/');
+                if (lastSlash === -1) return '.';
+                if (lastSlash === 0) return '/';
+                // Handle Windows drive letters like C:/
+                if (lastSlash === 2 && normalized[1] === ':') return normalized.slice(0, 3);
+                return normalized.slice(0, lastSlash);
+            }
+
+            function join(...parts) {
+                const joined = parts.map(p => p.replace(/\\/g, '/')).join('/');
+                // Clean up multiple slashes but preserve Windows drive letters
+                return joined.replace(/([^:])\/+/g, '$1/');
+            }
+
+            function resolve(from, to) {
+                // Normalize slashes
+                from = from.replace(/\\/g, '/');
+                to = to.replace(/\\/g, '/');
+
+                // If 'to' is absolute, return it
+                if (to.startsWith('/')) return to;
+                if (to.length >= 2 && to[1] === ':') return to; // Windows absolute path
+
+                // Handle relative paths
+                const fromParts = from.split('/').filter(p => p !== '');
+                const toParts = to.split('/');
+
+                for (const part of toParts) {
+                    if (part === '..') {
+                        // Don't pop the drive letter on Windows
+                        if (fromParts.length > 1 || (fromParts.length === 1 && !fromParts[0].includes(':'))) {
+                            fromParts.pop();
+                        }
+                    } else if (part !== '.' && part !== '') {
+                        fromParts.push(part);
+                    }
+                }
+
+                // Reconstruct path
+                const result = fromParts.join('/');
+                // If original from started with / and result doesn't have drive letter, add /
+                if (from.startsWith('/') && !result.match(/^[A-Za-z]:/)) {
+                    return '/' + result;
+                }
+                return result;
+            }
+
+            // Try to read a file
+            function tryReadFile(filepath) {
+                try {
+                    return globalThis.fs.readFileSync(filepath, 'utf8');
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            // Check if file exists
+            function fileExists(filepath) {
+                try {
+                    return globalThis.fs.existsSync(filepath);
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // Find package.json main entry
+            function getPackageMain(pkgDir) {
+                const pkgJsonPath = join(pkgDir, 'package.json');
+                const content = tryReadFile(pkgJsonPath);
+                if (!content) return null;
+
+                try {
+                    const pkg = JSON.parse(content);
+                    // Try various fields in order of priority
+                    return pkg.main || pkg.module || 'index.js';
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            // Check if path is absolute (Unix or Windows)
+            function isAbsolutePath(p) {
+                if (p.startsWith('/')) return true;
+                // Windows absolute path like C:/ or C:\
+                if (p.length >= 2 && p[1] === ':') return true;
+                return false;
+            }
+
+            // Resolve module path
+            function resolveModule(specifier, fromDir) {
+                // Relative or absolute paths
+                if (specifier.startsWith('./') || specifier.startsWith('../') || isAbsolutePath(specifier)) {
+                    const resolved = isAbsolutePath(specifier) ? specifier : resolve(fromDir, specifier);
+
+                    // Try exact path
+                    if (fileExists(resolved)) return resolved;
+
+                    // Try with extensions
+                    for (const ext of ['.js', '.mjs', '.cjs', '.json', '.ts']) {
+                        if (fileExists(resolved + ext)) return resolved + ext;
+                    }
+
+                    // Try as directory with index
+                    for (const ext of ['.js', '.mjs', '.cjs', '.ts']) {
+                        if (fileExists(join(resolved, 'index' + ext))) return join(resolved, 'index' + ext);
+                    }
+
+                    // Try package.json main
+                    const main = getPackageMain(resolved);
+                    if (main) {
+                        const mainPath = join(resolved, main);
+                        if (fileExists(mainPath)) return mainPath;
+                        for (const ext of ['.js', '.mjs', '.cjs']) {
+                            if (fileExists(mainPath + ext)) return mainPath + ext;
+                        }
+                    }
+
+                    return null;
+                }
+
+                // Node modules resolution - check if at root
+                function isRootDir(dir) {
+                    if (!dir || dir === '/' || dir === '.') return true;
+                    // Windows root like C:/ or C:
+                    if (dir.match(/^[A-Za-z]:[\\/]?$/)) return true;
+                    return false;
+                }
+
+                let currentDir = fromDir;
+                let prevDir = null;
+                while (currentDir && !isRootDir(currentDir) && currentDir !== prevDir) {
+                    const nodeModulesDir = join(currentDir, 'node_modules');
+                    const pkgDir = join(nodeModulesDir, specifier);
+
+                    // Check if package exists
+                    if (fileExists(pkgDir)) {
+                        // It's a directory - find main entry
+                        const main = getPackageMain(pkgDir) || 'index.js';
+                        const mainPath = join(pkgDir, main);
+
+                        if (fileExists(mainPath)) return mainPath;
+
+                        // Try with extensions
+                        for (const ext of ['.js', '.mjs', '.cjs']) {
+                            if (fileExists(mainPath + ext)) return mainPath + ext;
+                        }
+
+                        // Try index files
+                        for (const ext of ['.js', '.mjs', '.cjs']) {
+                            if (fileExists(join(pkgDir, 'index' + ext))) return join(pkgDir, 'index' + ext);
+                        }
+                    }
+
+                    // Check for file directly in node_modules
+                    for (const ext of ['', '.js', '.mjs', '.cjs', '.json']) {
+                        const filePath = join(nodeModulesDir, specifier + ext);
+                        if (fileExists(filePath)) return filePath;
+                    }
+
+                    // Go up one directory
+                    prevDir = currentDir;
+                    currentDir = dirname(currentDir);
+                }
+
+                return null;
+            }
+
+            // Create require function for a given directory
+            function createRequire(fromDir) {
+                function require(specifier) {
+                    // Check built-in modules first
+                    if (builtinModules[specifier]) {
+                        return builtinModules[specifier]();
+                    }
+
+                    // Resolve module path
+                    const resolvedPath = resolveModule(specifier, fromDir);
+                    if (!resolvedPath) {
+                        throw new Error(`Cannot find module '${specifier}' from '${fromDir}'`);
+                    }
+
+                    // Check cache
+                    if (globalThis.__moduleCache[resolvedPath]) {
+                        return globalThis.__moduleCache[resolvedPath].exports;
+                    }
+
+                    // Read file
+                    const code = tryReadFile(resolvedPath);
+                    if (code === null) {
+                        throw new Error(`Cannot read module '${resolvedPath}'`);
+                    }
+
+                    // Handle JSON files
+                    if (resolvedPath.endsWith('.json')) {
+                        const exports = JSON.parse(code);
+                        globalThis.__moduleCache[resolvedPath] = { exports };
+                        return exports;
+                    }
+
+                    // Create module object
+                    const module = { exports: {}, id: resolvedPath, filename: resolvedPath };
+                    globalThis.__moduleCache[resolvedPath] = module;
+
+                    // Create require for this module's directory
+                    const moduleDir = dirname(resolvedPath);
+                    const moduleRequire = createRequire(moduleDir);
+                    moduleRequire.resolve = (id) => resolveModule(id, moduleDir);
+                    moduleRequire.cache = globalThis.__moduleCache;
+
+                    // Wrap and execute
+                    const wrapper = `(function(exports, require, module, __filename, __dirname) { ${code} \n})`;
+                    try {
+                        const fn = eval(wrapper);
+                        fn(module.exports, moduleRequire, module, resolvedPath, moduleDir);
+                    } catch (e) {
+                        delete globalThis.__moduleCache[resolvedPath];
+                        throw e;
+                    }
+
+                    return module.exports;
+                }
+
+                require.resolve = (id) => resolveModule(id, fromDir);
+                require.cache = globalThis.__moduleCache;
+
+                return require;
+            }
+
+            // Set up global require from cwd
+            const cwd = globalThis.process?.cwd?.() || '.';
+            globalThis.require = createRequire(cwd);
+            globalThis.require.resolve = (id) => resolveModule(id, cwd);
+            globalThis.require.cache = globalThis.__moduleCache;
+
+            // Also support module.exports pattern for simple scripts
+            globalThis.module = { exports: {} };
+            globalThis.exports = globalThis.module.exports;
+        "#;
+
+        let source = Source::from_bytes(require_code.as_bytes());
         context
             .eval(source)
             .map_err(|e| RuntimeError::JsError(e.to_string()))?;

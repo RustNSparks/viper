@@ -1,17 +1,16 @@
 //! High-performance file system module for Viper runtime
 //!
 //! This module provides a blazingly fast file system API with async/await support,
-//! optimized for performance using tokio and platform-specific syscalls.
+//! optimized for performance using direct syscalls.
 //!
 //! Features:
-//! - Lazy file loading (BlobFile)
-//! - Optimized async/await operations
-//! - Incremental writing with FileSink
-//! - Streaming support for large files
+//! - Ultra-fast synchronous operations (like Bun)
+//! - Full Node.js fs API compatibility
+//! - fs.promises support
 //! - Zero-copy operations where possible
+//! - Direct syscalls without async overhead
 
-// pub mod native;  // TODO: Fix Boa API compatibility issues in native.rs
-// pub mod runtime;  // TODO: Fix Boa API compatibility issues in runtime.rs
+pub mod fast;
 pub mod simple;
 
 // The BlobFile, FileSink, and register_fs_module code below is temporarily disabled
