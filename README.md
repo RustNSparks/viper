@@ -44,6 +44,25 @@ Viper now includes comprehensive support for Node.js built-in modules:
 - **util** - Utility functions (`util.promisify()`, `util.inherits()`, `util.inspect()`, etc.)
 - **zlib** - Compression (`zlib.gzip()`, `zlib.gunzip()`, `zlib.deflate()`, etc.)
 
+### Node.js Error System
+
+Viper implements Node.js-compatible error codes and validation:
+
+- **Error Codes** - 100+ Node.js error codes (`ERR_INVALID_ARG_TYPE`, `ERR_MODULE_NOT_FOUND`, etc.)
+- **Error Classes** - `NodeError`, `NodeTypeError`, `NodeRangeError`, `SystemError`, `AbortError`
+- **Validators** - Comprehensive argument validation (`validateString`, `validateInteger`, etc.)
+- **Compatibility** - Match Node.js error messages exactly for better debugging
+
+```javascript
+const { codes: { ERR_INVALID_ARG_TYPE } } = require('internal/errors');
+
+function myAPI(name) {
+  if (typeof name !== 'string') {
+    throw new ERR_INVALID_ARG_TYPE('name', 'string', name);
+  }
+}
+```
+
 ### Networking
 
 - **HTTP Client** - Full Fetch API support + Node.js `http` module
@@ -499,6 +518,11 @@ viper/
 ├── src/
 │   ├── main.rs          # CLI entry point
 │   ├── lib.rs           # Library exports
+│   ├── js/              # Internal JavaScript modules
+│   │   ├── internal/    # Internal utilities (Node.js compatibility)
+│   │   │   ├── errors.js    # Node.js error codes
+│   │   │   └── validators.js # Argument validation
+│   │   └── README.md    # JS modules documentation
 │   ├── runtime/         # Boa runtime & APIs
 │   │   ├── mod.rs       # Runtime core
 │   │   ├── worker.rs    # Web Workers
@@ -526,6 +550,8 @@ viper/
 │   ├── fs/              # File system APIs
 │   ├── pm/              # Package manager (optional)
 │   └── server/          # HTTP server (optional)
+├── lib/                 # Node.js module library
+│   └── README.md        # Module compatibility strategy
 ├── examples/            # Example TypeScript files
 ├── types/
 │   └── viper.d.ts       # TypeScript definitions
