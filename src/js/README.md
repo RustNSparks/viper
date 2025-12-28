@@ -8,7 +8,11 @@ This directory contains internal JavaScript modules for Viper's Node.js compatib
 src/js/
 ├── internal/           # Internal utilities (not exposed to users)
 │   ├── errors.js       # Node.js error codes and error classes
-│   └── validators.js   # Argument validation utilities
+│   ├── validators.js   # Argument validation utilities
+│   └── timers.js       # Timer implementation (Timeout and Immediate classes)
+├── timers/             # Timers module
+│   └── promises.js     # Promise-based timers API
+├── timers.js           # Main timers module export
 └── README.md
 ```
 
@@ -62,6 +66,64 @@ function readFile(path, options) {
   // ... rest of implementation
 }
 ```
+
+### `internal/timers.js`
+
+Provides the underlying implementation for Node.js timers:
+
+- **Classes**: `Timeout`, `Immediate` with full Node.js API
+- **Methods**: `ref()`, `unref()`, `refresh()`, `hasRef()`, `close()`
+- **Symbol support**: `Symbol.toPrimitive`, `Symbol.dispose`
+- **Tracking**: Active timer management
+
+Usage:
+```javascript
+const { setTimeout, setInterval, Timeout } = require('internal/timers');
+
+const timeout = setTimeout(() => {
+  console.log('Hello!');
+}, 1000);
+
+timeout.unref(); // Don't keep event loop alive
+timeout.refresh(); // Reset timer
+```
+
+### `timers.js`
+
+Main timers module that users can require:
+
+```javascript
+const { setTimeout, setInterval, setImmediate } = require('timers');
+// Same as global timers but as a module
+```
+
+### `timers/promises.js`
+
+Promise-based timer API:
+
+```javascript
+const { setTimeout, setImmediate, setInterval } = require('timers/promises');
+
+// Promise-based setTimeout
+await setTimeout(1000, 'result'); // Returns 'result' after 1s
+
+// Async iterator setInterval
+for await (const value of setInterval(100, Date.now())) {
+  console.log(value);
+  if (condition) break;
+}
+
+// Scheduler API (experimental)
+const { scheduler } = require('timers/promises');
+await scheduler.wait(1000); // Wait 1 second
+await scheduler.yield(); // Yield to event loop
+```
+
+Features:
+- AbortSignal support for cancellation
+- `ref` option to control event loop behavior
+- Async iterator for setInterval
+- Scheduler API for Web Platform compatibility
 
 ## Benefits
 
@@ -156,11 +218,19 @@ pub fn throw_err_invalid_arg_type(
 - WASI errors (`ERR_WASI_*`)
 
 ### Additional Internal Modules
+- ✅ `internal/timers.js` - Timer implementation (Timeout, Immediate)
 - `internal/util.js` - Shared utilities
 - `internal/streams.js` - Stream utilities
 - `internal/url.js` - URL parsing utilities
 - `internal/buffer.js` - Buffer utilities
 - `internal/process.js` - Process utilities
+
+### Additional Public Modules
+- ✅ `timers.js` - Node.js timers module
+- ✅ `timers/promises.js` - Promise-based timers
+- `events.js` - EventEmitter module
+- `stream.js` - Stream module
+- `fs.js` - File system module
 
 ### Testing
 Each internal module should have comprehensive tests to ensure Node.js compatibility.
