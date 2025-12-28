@@ -2069,8 +2069,24 @@ impl Runtime {
             code.to_string()
         };
 
+        // Wrap the main script in a CommonJS-like wrapper to provide __dirname, __filename, etc.
+        // This allows top-level scripts to use require() and have access to module-like globals
+        // Convert Windows paths to forward slashes for consistency
+        let normalized_filename = filename.replace('\\', "/");
+        let wrapped_code = format!(
+            r#"(function() {{
+                const __filename = '{}';
+                const __dirname = globalThis.path ? globalThis.path.dirname(__filename) : '.';
+                const exports = {{}};
+                const module = {{ exports: exports }};
+                {}
+            }})();"#,
+            normalized_filename.replace('\'', "\\'"),
+            js_code
+        );
+
         // Evaluate the JavaScript code
-        let source = Source::from_bytes(js_code.as_bytes());
+        let source = Source::from_bytes(wrapped_code.as_bytes());
         let result = self.context.eval(source);
 
         // Run the event loop to completion, including waiting for workers
@@ -2127,12 +2143,12 @@ impl Runtime {
     /// Run a TypeScript file with full event loop support
     pub fn run_file(&mut self, path: &Path) -> RuntimeResult<JsValue> {
         let source = std::fs::read_to_string(path)?;
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("input.ts");
 
-        self.run(&source, filename)
+        // Get the full absolute path for __filename
+        let full_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let full_path_str = full_path.to_string_lossy().to_string();
+
+        self.run(&source, &full_path_str)
     }
 
     /// Execute TypeScript code as a module (supports top-level await)
